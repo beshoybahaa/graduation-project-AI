@@ -50,8 +50,8 @@ class graphRAG:
         
     def load_model(self):
         
-        model_name = "deepseek-r1-distill-llama-70b"
-        self.llm = Groq(model=model_name, api_key=self.deepseek_r1_distill_llama_70b)
+        model_name = "gemma2-9b-it"
+        self.llm = Groq(model=model_name, api_key=self.gemma2_9b_it)
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
         return
