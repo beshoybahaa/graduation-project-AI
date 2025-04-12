@@ -28,7 +28,8 @@ class input_body(BaseModel):
 class graphRAG:
 
     
-    llm = None
+    llm_graph = None
+    llm_questions = None
     embedding_model = None
     index = None
     deepseek_r1_distill_llama_70b = "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"
@@ -50,9 +51,11 @@ class graphRAG:
         
     def load_model(self):
         
-        model_name = "gemma2-9b-it"
-        self.llm = Groq(model=model_name, api_key=self.gemma2_9b_it)
+        model_name_questions = "deepseek-r1-distill-llama-70b"
+        self.llm_questions = Groq(model=model_name_questions, api_key=self.deepseek_r1_distill_llama_70b)
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        model_name_graph = "gemma2-9b-it"
+        self.llm_graph = Groq(model=model_name_graph, api_key=self.gemma2_9b_it)
 
         return
 
@@ -71,7 +74,7 @@ class graphRAG:
     def index_doc(self,doc,path):
         self.index = PropertyGraphIndex.from_documents(
                 doc,
-                llm=self.llm,
+                llm=self.llm_graph,
                 embed_model=self.embedding_model,
                 property_graph_store=self.store,
                 )
@@ -85,7 +88,7 @@ class graphRAG:
          #   llm=self.llm
         #)
         self.query_engine = self.index.as_query_engine(
-            llm=self.llm,
+            llm=self.llm_questions,
             include_text=True,
             )
         return
