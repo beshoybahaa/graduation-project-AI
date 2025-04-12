@@ -43,7 +43,7 @@ class graphRAG:
             username="neo4j",
             password="g6DTWAKPPHTvJWNBEZ4vgTDSTt99ZUkE-hlyWv7-1Bg",
             url="neo4j+s://8fef1a11.databases.neo4j.io",
-            database="Instance01"
+            #database="Instance01"
         )
         self.store = graph_store
 
