@@ -8,6 +8,8 @@ from pyngrok import ngrok
 import uvicorn
 from pydantic import BaseModel
 from typing import Annotated
+import time
+from tenacity import retry, stop_after_attempt, wait_exponential
 
 # response of the model
 class Prediction(BaseModel):
@@ -61,15 +63,23 @@ class graphRAG:
         return documents
 
     # index the document
+    @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=4, max=60))
     def index_doc(self,doc,path):
-        self.index = PropertyGraphIndex.from_documents(
-            doc,
-            llm=self.llm_graph,
-            embed_model=self.embedding_model,
-            property_graph_store=self.store,
-        )
-        # index.storage_context.persist(persist_dir=path)
-        return index
+        try:
+            self.index = PropertyGraphIndex.from_documents(
+                doc,
+                llm=self.llm_graph,
+                embed_model=self.embedding_model,
+                property_graph_store=self.store,
+            )
+            return self.index
+        except Exception as e:
+            if "rate_limit_exceeded" in str(e):
+                print(f"Rate limit exceeded. Retrying...")
+                raise
+            else:
+                print(f"Error during indexing: {str(e)}")
+                raise
 
     # load the index
     def load_index(self,path):
