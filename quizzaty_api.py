@@ -1,10 +1,6 @@
-
-
 import asyncio
 import nest_asyncio
-
 nest_asyncio.apply()
-
 
 from typing import Union
 from fastapi import FastAPI, UploadFile, Form, File
@@ -13,21 +9,18 @@ import uvicorn
 from pydantic import BaseModel
 from typing import Annotated
 
-
+# response of the model
 class Prediction(BaseModel):
-    """
-    response of the model
-    """
     response_answer: str
 
-
+# input of the model
 class input_body(BaseModel):
     path:str
 
 
+# graphRAG class
 class graphRAG:
-
-    
+    # variables
     llm_graph = None
     llm_questions = None
     embedding_model = None
@@ -38,8 +31,8 @@ class graphRAG:
     query_engine = None
     store = None
     
+    # Create a Neo4jPropertyGraphStore instance
     def __init__(self):
-        # Create a Neo4jPropertyGraphStore instance
         graph_store = Neo4jPropertyGraphStore(
             username="neo4j",
             password="g6DTWAKPPHTvJWNBEZ4vgTDSTt99ZUkE-hlyWv7-1Bg",
@@ -48,51 +41,50 @@ class graphRAG:
         )
         self.store = graph_store
 
-        
+    # load the model if not loaded
     def load_model(self):
-        
         model_name_questions = "deepseek-r1-distill-llama-70b"
         self.llm_questions = Groq(model=model_name_questions, api_key=self.deepseek_r1_distill_llama_70b)
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
         model_name_graph = "gemma2-9b-it"
         self.llm_graph = Groq(model=model_name_graph, api_key=self.gemma2_9b_it)
-
         return
 
-    
+    # load the uploaded document
     def load_doc(self,file,path):
         file_path = f'{path}/{file.filename}.pdf'
         # Save the uploaded file
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-    
         # Read documents from the temp directory
         documents = SimpleDirectoryReader(path).load_data()
         return documents
 
-    
+    # index the document
     def index_doc(self,doc,path):
         self.index = PropertyGraphIndex.from_documents(
-                doc,
-                llm=self.llm_graph,
-                embed_model=self.embedding_model,
-                property_graph_store=self.store,
-                )
+            doc,
+            llm=self.llm_graph,
+            embed_model=self.embedding_model,
+            property_graph_store=self.store,
+        )
         # index.storage_context.persist(persist_dir=path)
         return index
 
+    # load the index
     def load_index(self,path):
         #self.index = load_index_from_storage(
-           # StorageContext.from_defaults(persist_dir=path),
-          #  embed_model=self.embedding_model,
-         #   llm=self.llm
+        #    StorageContext.from_defaults(persist_dir=path),
+        #   embed_model=self.embedding_model,
+        #   llm=self.llm
         #)
         self.query_engine = self.index.as_query_engine(
             llm=self.llm_questions,
             include_text=True,
-            )
+        )
         return
         
+    # prediction
     def prediction(self):  # dependency
         response = self.query_engine.query("""You are an AI designed to generate multiple-choice questions (MCQs) based on a provided chapter of a book. Your task is to create a set of MCQs that focus on the main subject matter of the chapter, incorporating a range of difficulty levels. Ensure that each question is clear, concise, and relevant to the core themes of the chapter and be closed book style. Use the following structure for the MCQs:
             
@@ -119,11 +111,13 @@ class graphRAG:
             End the generated MCQs with a summary statement of the chapter's main subject to reinforce learning.""")
         return response
 
+    # clear the neo4j
     def clear_neo4j(self):
         # Use the internal driver to execute raw Cypher
         with self.store._driver.session(database=self.store._database) as session:
             session.run("MATCH (n) DETACH DELETE n")
 
+# import the libraries
 from llama_index.core import PropertyGraphIndex
 from dotenv import load_dotenv
 from llama_index.core import SimpleDirectoryReader
@@ -136,12 +130,13 @@ import tempfile
 import shutil
 from llama_index.graph_stores.neo4j import Neo4jPropertyGraphStore
 
-
+# create the app
 app = FastAPI()
 
+# create the graphRAG object
 graphrag = graphRAG()
 
-
+# get request
 @app.get('/')
 def index():
     return {'message': 'Quizaty API!'}
