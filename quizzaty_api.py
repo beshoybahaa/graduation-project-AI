@@ -147,7 +147,7 @@ def index():
 # post request that takes a review (text type) and returns a sentiment score
 @app.post('/questions')
 async def predict(file: Annotated[UploadFile, File()]) -> Prediction:
-    path = "./PDFs"
+    path = "./"
     print(f"Received file: {file.filename}")
     print(f"Received path: {path}")
     graphrag.load_model()
