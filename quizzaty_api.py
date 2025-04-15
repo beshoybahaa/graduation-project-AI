@@ -82,24 +82,24 @@ class graphRAG:
     #             raise
 
     def index_doc(self, doc, path):
-    try:
-        for d in doc:
-            time.sleep(1)  # Adjust delay (in seconds) based on your rate limits
-            # index each doc one at a time if needed
-            self.index = PropertyGraphIndex.from_documents(
-                [d],  # wrap single doc in list
-                llm=self.Groq(model=model_name_questions, api_key=self.deepseek_r1_distill_llama_70b, max_retries=0),
-                embed_model=self.embedding_model,
-                property_graph_store=self.store,
-            )
-        return self.index
-    except Exception as e:
-        if "rate_limit_exceeded" in str(e):
-            print("Rate limit exceeded. Retrying...")
-            raise
-        else:
-            print(f"Error during indexing: {str(e)}")
-            raise
+        try:
+            for d in doc:
+                time.sleep(1)  # Adjust delay (in seconds) based on your rate limits
+                # index each doc one at a time if needed
+                self.index = PropertyGraphIndex.from_documents(
+                    [d],  # wrap single doc in list
+                    llm=self.Groq(model=model_name_questions, api_key=self.deepseek_r1_distill_llama_70b, max_retries=0),
+                    embed_model=self.embedding_model,
+                    property_graph_store=self.store,
+                )
+            return self.index
+        except Exception as e:
+            if "rate_limit_exceeded" in str(e):
+                print("Rate limit exceeded. Retrying...")
+                raise
+            else:
+                print(f"Error during indexing: {str(e)}")
+                raise
 
     # load the index
     def load_index(self,path):
