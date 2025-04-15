@@ -84,8 +84,8 @@ class graphRAG:
     def index_doc(self, doc, path):
         try:
             # Split docs into chunks of 3
-            for i in range(0, len(doc), 10):
-                batch = doc[i:i+10]
+            for i in range(0, len(doc), 100):
+                batch = doc[i:i+100]
                 time.sleep(1)  # Delay between batches
                 self.index = PropertyGraphIndex.from_documents(
                     batch,
