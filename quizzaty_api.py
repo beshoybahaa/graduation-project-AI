@@ -83,12 +83,13 @@ class graphRAG:
 
     def index_doc(self, doc, path):
         try:
-            for d in doc:
-                time.sleep(1)  # Adjust delay (in seconds) based on your rate limits
-                # index each doc one at a time if needed
+            # Split docs into chunks of 3
+            for i in range(0, len(doc), 3):
+                batch = doc[i:i+3]
+                time.sleep(1)  # Delay between batches
                 self.index = PropertyGraphIndex.from_documents(
-                    [d],  # wrap single doc in list
-                    llm=self.llm_graph,
+                    batch,
+                    llm=self.Groq(model=model_name_questions, api_key=self.deepseek_r1_distill_llama_70b, max_retries=0),
                     embed_model=self.embedding_model,
                     property_graph_store=self.store,
                 )
