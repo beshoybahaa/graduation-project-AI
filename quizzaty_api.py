@@ -11,11 +11,6 @@ from typing import Annotated
 import time
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-from fastapi.responses import JSONResponse
-
 
 
 # response of the model
@@ -147,6 +142,11 @@ from llama_index.core import StorageContext, load_index_from_storage
 import tempfile
 import shutil
 from llama_index.graph_stores.neo4j import Neo4jPropertyGraphStore
+
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from fastapi.responses import JSONResponse
 
 # create the app
 app = FastAPI()
