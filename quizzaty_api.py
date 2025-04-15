@@ -11,10 +11,6 @@ from typing import Annotated
 import time
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-limiter = Limiter(key_func=get_remote_address)
-
 # response of the model
 class Prediction(BaseModel):
     response_answer: str
@@ -68,23 +64,42 @@ class graphRAG:
 
     # index the document
     # @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=4, max=60))
-    @limiter.limit("5/minute")
-    def index_doc(self,doc,path):
-        try:
+    # def index_doc(self,doc,path):
+    #     try:
+    #         self.index = PropertyGraphIndex.from_documents(
+    #             doc,
+    #             llm=self.llm_graph,
+    #             embed_model=self.embedding_model,
+    #             property_graph_store=self.store,
+    #         )
+    #         return self.index
+    #     except Exception as e:
+    #         if "rate_limit_exceeded" in str(e):
+    #             print(f"Rate limit exceeded. Retrying...")
+    #             raise
+    #         else:
+    #             print(f"Error during indexing: {str(e)}")
+    #             raise
+
+    def index_doc(self, doc, path):
+    try:
+        for d in doc:
+            time.sleep(1)  # Adjust delay (in seconds) based on your rate limits
+            # index each doc one at a time if needed
             self.index = PropertyGraphIndex.from_documents(
-                doc,
-                llm=self.llm_graph,
+                [d],  # wrap single doc in list
+                llm=self.Groq(model=model_name_questions, api_key=self.deepseek_r1_distill_llama_70b, max_retries=0),
                 embed_model=self.embedding_model,
                 property_graph_store=self.store,
             )
-            return self.index
-        except Exception as e:
-            if "rate_limit_exceeded" in str(e):
-                print(f"Rate limit exceeded. Retrying...")
-                raise
-            else:
-                print(f"Error during indexing: {str(e)}")
-                raise
+        return self.index
+    except Exception as e:
+        if "rate_limit_exceeded" in str(e):
+            print("Rate limit exceeded. Retrying...")
+            raise
+        else:
+            print(f"Error during indexing: {str(e)}")
+            raise
 
     # load the index
     def load_index(self,path):
@@ -145,17 +160,8 @@ import tempfile
 import shutil
 from llama_index.graph_stores.neo4j import Neo4jPropertyGraphStore
 
-from slowapi import Limiter
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-from fastapi.responses import JSONResponse
-
 # create the app
 app = FastAPI()
-
-#test
-
-app.state.limiter = limiter
 
 # create the graphRAG object
 graphrag = graphRAG()
