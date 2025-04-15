@@ -11,6 +11,8 @@ from typing import Annotated
 import time
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 limiter = Limiter(key_func=get_remote_address)
 
 # response of the model
