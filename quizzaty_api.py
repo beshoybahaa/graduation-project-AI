@@ -89,7 +89,7 @@ class graphRAG:
                 time.sleep(1)  # Delay between batches
                 self.index = PropertyGraphIndex.from_documents(
                     batch,
-                    llm=self.Groq(model=model_name_questions, api_key=self.deepseek_r1_distill_llama_70b, max_retries=0),
+                    llm=self.llm_graph,
                     embed_model=self.embedding_model,
                     property_graph_store=self.store,
                 )
