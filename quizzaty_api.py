@@ -11,7 +11,7 @@ from typing import Annotated
 import time
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-
+limiter = Limiter(key_func=get_remote_address)
 
 # response of the model
 class Prediction(BaseModel):
@@ -152,7 +152,7 @@ from fastapi.responses import JSONResponse
 app = FastAPI()
 
 #test
-limiter = Limiter(key_func=get_remote_address)
+
 app.state.limiter = limiter
 
 # create the graphRAG object
