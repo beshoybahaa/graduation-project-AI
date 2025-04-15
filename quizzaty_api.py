@@ -11,6 +11,14 @@ from typing import Annotated
 import time
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from fastapi.responses import JSONResponse
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+
+
 # response of the model
 class Prediction(BaseModel):
     response_answer: str
@@ -63,7 +71,8 @@ class graphRAG:
         return documents
 
     # index the document
-    @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=4, max=60))
+    # @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=4, max=60))
+    @limiter.limit("5/minute")
     def index_doc(self,doc,path):
         try:
             self.index = PropertyGraphIndex.from_documents(
