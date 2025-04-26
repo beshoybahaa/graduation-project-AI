@@ -5,7 +5,7 @@ FROM python:3.10
 WORKDIR /app
 
 # Copy the virtual environment
-COPY llamaenv/ /app/llamaenv/
+COPY ../llamaenv/ /app/llamaenv/
 
 # Copy the application code
 COPY . .
