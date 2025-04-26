@@ -12,5 +12,5 @@ COPY . .
 
 # Activate virtual environment and run FastAPI server
 SHELL ["/bin/bash", "-c"]
-CMD source llamaenv/bin/activate && \
+CMD source ../llamaenv/bin/activate && \
     uvicorn quizzaty_api:app --host 0.0.0.0 --port 8000
