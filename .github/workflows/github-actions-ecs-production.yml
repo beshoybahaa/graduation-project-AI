@@ -25,9 +25,11 @@ jobs:
 
 
       - name: Create ECR repository if it doesn't exist
+        env:
+            REPOSITORY: ${{ secrets.ECS_REPOSITORY }}
         run: |
-          aws ecr describe-repositories --repository-names $secrets.ECS_REPOSITORY \
-            || aws ecr create-repository --repository-name $secrets.ECS_REPOSITORY
+          aws ecr describe-repositories --repository-names $REPOSITORY \
+            || aws ecr create-repository --repository-name $REPOSITORY
 
 
 
