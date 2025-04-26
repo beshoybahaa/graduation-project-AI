@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+pydantic
+pyngrok
+tenacity
+python-dotenv
+llama-index
+llama-index-llms-groq
+llama-index-embeddings-huggingface
+llama-index-graph-stores-neo4j
+neo4j
+nest_asyncio 
