@@ -1,6 +1,6 @@
-import asyncio
-import nest_asyncio
-nest_asyncio.apply()
+# import asyncio
+# import nest_asyncio
+# nest_asyncio.apply()
 
 from typing import Union
 from fastapi import FastAPI, UploadFile, Form, File
@@ -116,7 +116,7 @@ class graphRAG:
         return
         
     # prediction
-    def prediction(self):  # dependency
+    async def prediction(self):  # dependency
         response = self.query_engine.query("""You are an AI designed to generate multiple-choice questions (MCQs) based on a provided chapter of a book. Your task is to create a set of MCQs that focus on the main subject matter of the chapter, incorporating a range of difficulty levels. Ensure that each question is clear, concise, and relevant to the core themes of the chapter and be closed book style. Use the following structure for the MCQs:
             
             1. **Question Statement**: A clear and precise question related to the chapter content.
@@ -187,7 +187,7 @@ async def predict(file: Annotated[UploadFile, File()]) -> Prediction:
     print("index_doc : done")
     graphrag.load_index(path)
     print("load_index : done")
-    test= graphrag.prediction()
+    test= await graphrag.prediction()
     print(type(test))
     response_answer = str(test)
     graphrag.clear_neo4j()
