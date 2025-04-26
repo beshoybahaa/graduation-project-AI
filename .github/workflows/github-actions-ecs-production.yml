@@ -23,6 +23,15 @@ jobs:
         with:
           mask-password: 'true'
 
+
+      - name: Create ECR repository if it doesn't exist
+        run: |
+          aws ecr describe-repositories --repository-names $secrets.ECS_REPOSITORY \
+            || aws ecr create-repository --repository-name $secrets.ECS_REPOSITORY
+
+
+
+
       - name: Build, tag, and push image to Amazon ECR
         id: build-image
         env:
