@@ -40,7 +40,6 @@
   "networkMode": "awsvpc",
   "volumes": [],
   "placementConstraints": [],
-  "compatibilities": ["EC2", "FARGATE"],
   "requiresCompatibilities": ["FARGATE"],
   "cpu": "1024",
   "memory": "3072",
