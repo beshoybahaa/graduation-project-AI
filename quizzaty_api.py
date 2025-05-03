@@ -32,20 +32,19 @@ class graphRAG:
     doc = None
     query_engine = None
     store = None
+    temp_dir = None
     
-    # Create a Neo4jPropertyGraphStore instance
     def __init__(self):
-        try:
-            graph_store = Neo4jPropertyGraphStore(
-                username="neo4j",
-                password="g6DTWAKPPHTvJWNBEZ4vgTDSTt99ZUkE-hlyWv7-1Bg",
-                url="neo4j+s://8fef1a11.databases.neo4j.io",
-                #database="Instance01",
-            )
-            self.store = graph_store
-        except Exception as e:
-            print(f"Error connecting to Neo4j: {str(e)}")
-            raise
+        # Create a temporary directory for the graph store
+        self.temp_dir = tempfile.mkdtemp()
+        # Initialize a simple graph store
+        self.store = SimpleGraphStore()
+        
+    def __del__(self):
+        # Clean up temporary directory when object is destroyed
+        if self.temp_dir and os.path.exists(self.temp_dir):
+            import shutil
+            shutil.rmtree(self.temp_dir)
 
     # load the model if not loaded
     def load_model(self):
@@ -66,25 +65,6 @@ class graphRAG:
         documents = SimpleDirectoryReader(path).load_data()
         return documents
 
-    # index the document
-    # @retry(stop=stop_after_attempt(5), wait=wait_exponential(multiplier=1, min=4, max=60))
-    # def index_doc(self,doc,path):
-    #     try:
-    #         self.index = PropertyGraphIndex.from_documents(
-    #             doc,
-    #             llm=self.llm_graph,
-    #             embed_model=self.embedding_model,
-    #             property_graph_store=self.store,
-    #         )
-    #         return self.index
-    #     except Exception as e:
-    #         if "rate_limit_exceeded" in str(e):
-    #             print(f"Rate limit exceeded. Retrying...")
-    #             raise
-    #         else:
-    #             print(f"Error during indexing: {str(e)}")
-    #             raise
-
     def index_doc(self, doc, path):
         try:
             # Split docs into chunks of 3
@@ -99,20 +79,11 @@ class graphRAG:
                 )
             return self.index
         except Exception as e:
-            if "rate_limit_exceeded" in str(e):
-                print("Rate limit exceeded. Retrying...")
-                raise
-            else:
-                print(f"Error during indexing: {str(e)}")
-                raise
+            print(f"Error during indexing: {str(e)}")
+            raise
 
     # load the index
     def load_index(self,path):
-        #self.index = load_index_from_storage(
-        #    StorageContext.from_defaults(persist_dir=path),
-        #   embed_model=self.embedding_model,
-        #   llm=self.llm
-        #)
         self.query_engine = self.index.as_query_engine(
             llm=self.llm_questions,
             include_text=True,
@@ -146,11 +117,10 @@ class graphRAG:
             End the generated MCQs with a summary statement of the chapter's main subject to reinforce learning.""")
         return response
 
-    # clear the neo4j
+    # clear the graph store
     def clear_neo4j(self):
-        # Use the internal driver to execute raw Cypher
-        with self.store._driver.session(database=self.store._database) as session:
-            session.run("MATCH (n) DETACH DELETE n")
+        # Clear the simple graph store
+        self.store.clear()
 
 # import the libraries
 from llama_index.core import PropertyGraphIndex
@@ -163,7 +133,7 @@ from datetime import datetime
 from llama_index.core import StorageContext, load_index_from_storage
 import tempfile
 import shutil
-from llama_index.graph_stores.neo4j import Neo4jPropertyGraphStore
+from llama_index.graph_stores.simple import SimpleGraphStore
 
 # create the app
 app = FastAPI()
