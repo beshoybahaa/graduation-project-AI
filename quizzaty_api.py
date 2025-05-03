@@ -41,10 +41,6 @@ class graphRAG:
                 password="g6DTWAKPPHTvJWNBEZ4vgTDSTt99ZUkE-hlyWv7-1Bg",
                 url="neo4j+s://8fef1a11.databases.neo4j.io",
                 #database="Instance01",
-                max_connection_lifetime=3600,
-                max_connection_pool_size=50,
-                connection_timeout=30,
-                max_retry_time=30
             )
             self.store = graph_store
         except Exception as e:
