@@ -133,7 +133,7 @@ from datetime import datetime
 from llama_index.core import StorageContext, load_index_from_storage
 import tempfile
 import shutil
-from llama_index.graph_stores.simple import SimpleGraphStore
+from llama_index.core.graph_stores import SimpleGraphStore
 
 # create the app
 app = FastAPI()
