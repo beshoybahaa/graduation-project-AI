@@ -31,14 +31,11 @@ class graphRAG:
     gemma2_9b_it = "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"
     doc = None
     query_engine = None
-    store = None
     temp_dir = None
     
     def __init__(self):
-        # Create a temporary directory for the graph store
+        # Create a temporary directory for storage
         self.temp_dir = tempfile.mkdtemp()
-        # Initialize a simple graph store
-        self.store = SimpleGraphStore()
         
     def __del__(self):
         # Clean up temporary directory when object is destroyed
@@ -67,16 +64,16 @@ class graphRAG:
 
     def index_doc(self, doc, path):
         try:
-            # Split docs into chunks of 3
-            for i in range(0, len(doc), 15):
-                batch = doc[i:i+15]
-                time.sleep(1)  # Delay between batches
-                self.index = PropertyGraphIndex.from_documents(
-                    batch,
-                    llm=self.llm_graph,
-                    embed_model=self.embedding_model,
-                    property_graph_store=self.store,
-                )
+            # Create storage context
+            storage_context = StorageContext.from_defaults()
+            
+            # Create vector store index
+            self.index = VectorStoreIndex.from_documents(
+                doc,
+                storage_context=storage_context,
+                embed_model=self.embedding_model,
+                show_progress=True
+            )
             return self.index
         except Exception as e:
             print(f"Error during indexing: {str(e)}")
@@ -86,7 +83,7 @@ class graphRAG:
     def load_index(self,path):
         self.query_engine = self.index.as_query_engine(
             llm=self.llm_questions,
-            include_text=True,
+            similarity_top_k=3
         )
         return
         
@@ -117,23 +114,23 @@ class graphRAG:
             End the generated MCQs with a summary statement of the chapter's main subject to reinforce learning.""")
         return response
 
-    # clear the graph store
+    # clear the index
     def clear_neo4j(self):
-        # Clear the simple graph store
-        self.store.clear()
+        # Clear the index
+        if self.index:
+            self.index = None
 
 # import the libraries
-from llama_index.core import PropertyGraphIndex
+from llama_index.core import VectorStoreIndex
 from dotenv import load_dotenv
 from llama_index.core import SimpleDirectoryReader
 from llama_index.llms.groq import Groq
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 import os
 from datetime import datetime
-from llama_index.core import StorageContext, load_index_from_storage
+from llama_index.core import StorageContext
 import tempfile
 import shutil
-from llama_index.core.graph_stores import SimpleGraphStore
 
 # create the app
 app = FastAPI()

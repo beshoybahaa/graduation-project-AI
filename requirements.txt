@@ -7,7 +7,5 @@ python-dotenv
 llama-index-core>=0.10.0
 llama-index-llms-groq
 llama-index-embeddings-huggingface
-llama-index-graph-stores-neo4j
-neo4j
-nest_asyncio
 python-multipart
+nest_asyncio
