@@ -1,8 +1,8 @@
 {
   "containerDefinitions": [
     {
-      "name": "quizatty-container",
-      "image": "554707572584.dkr.ecr.eu-central-1.amazonaws.com/quizatty-repo:latest",
+      "name": "quizatty-ai-container",
+      "image": "766932388154.dkr.ecr.eu-central-1.amazonaws.com/quizatty-ai-repo:latest",
       "cpu": 1024,
       "portMappings": [
         {
@@ -23,7 +23,7 @@
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
-          "awslogs-group": "/ecs/quizatty-task",
+          "awslogs-group": "/ecs/quizatty-ai-task",
           "mode": "non-blocking",
           "awslogs-create-group": "true",
           "max-buffer-size": "25m",
@@ -35,8 +35,8 @@
       "systemControls": []
     }
   ],
-  "family": "quizatty-task",
-  "executionRoleArn": "arn:aws:iam::554707572584:role/ecsTaskExecutionRole",
+  "family": "quizatty-ai-task",
+  "executionRoleArn": "arn:aws:iam::766932388154:role/ecsTaskExecutionRole",
   "networkMode": "awsvpc",
   "volumes": [],
   "placementConstraints": [],
