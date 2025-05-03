@@ -35,13 +35,21 @@ class graphRAG:
     
     # Create a Neo4jPropertyGraphStore instance
     def __init__(self):
-        graph_store = Neo4jPropertyGraphStore(
-            username="neo4j",
-            password="g6DTWAKPPHTvJWNBEZ4vgTDSTt99ZUkE-hlyWv7-1Bg",
-            url="neo4j+s://8fef1a11.databases.neo4j.io",
-            #database="Instance01"
-        )
-        self.store = graph_store
+        try:
+            graph_store = Neo4jPropertyGraphStore(
+                username="neo4j",
+                password="g6DTWAKPPHTvJWNBEZ4vgTDSTt99ZUkE-hlyWv7-1Bg",
+                url="neo4j+s://8fef1a11.databases.neo4j.io",
+                #database="Instance01",
+                max_connection_lifetime=3600,
+                max_connection_pool_size=50,
+                connection_timeout=30,
+                max_retry_time=30
+            )
+            self.store = graph_store
+        except Exception as e:
+            print(f"Error connecting to Neo4j: {str(e)}")
+            raise
 
     # load the model if not loaded
     def load_model(self):
