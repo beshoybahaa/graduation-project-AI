@@ -89,29 +89,40 @@ class graphRAG:
         
     # prediction
     async def prediction(self):  # dependency
-        response = self.query_engine.query("""You are an AI designed to generate multiple-choice questions (MCQs) based on a provided chapter of a book. Your task is to create a set of MCQs that focus on the main subject matter of the chapter, incorporating a range of difficulty levels. Ensure that each question is clear, concise, and relevant to the core themes of the chapter and be closed book style. Use the following structure for the MCQs:
+        difficulty_level = "easy"
+        response = query_engine.query("""You are an AI designed to generate multiple-choice questions (MCQs) based on a provided chapter of a book. Your task is to create a set of MCQs that focus on the main subject matter of the chapter. Ensure that each question is clear, concise, and relevant to the core themes of the chapter and be closed book style. Use the following structure for the MCQs:
             
             1. **Question Statement**: A clear and precise question related to the chapter content.
             2. **Answer Choices**: Four options labeled A, B, C, and D, where only one option is correct. The incorrect options should be plausible to challenge the reader's knowledge.
-            3. **Difficulty Level**: Indicate the difficulty level of each question (Easy, Medium, Hard) to help categorize the questions.
+            3. **Correct Answer**: give me the correct answer of the question
             examples for questions : 
             1		Which of the following is not one of the components of a data communication system?
-            	A)	Message
-            	B)	Sender
-            	C)	Medium
-            	D)	All of the choices are correct
+                A)	Message
+                B)	Sender
+                C)	Medium
+                D)	All of the choices are correct
             
             2		Which of the following is not one of the characteristics of a data communication system?
-            	A)	Delivery
-            	B)	Accuracy
-            	C)	Jitter
-            	D)	All of the choices are correct
+                A)	Delivery
+                B)	Accuracy
+                C)	Jitter
+                D)	All of the choices are correct
             
-            Please ensure that the questions reflect a deep understanding of the chapter's main ideas and concepts while varying the complexity to accommodate different levels of knowledge. Provide 40 questions for hard level. 
+            Please ensure that the questions reflect a deep understanding of the chapter's main ideas and concepts while varying the complexity to accommodate different levels of knowledge. Provide 40 questions for {0} level. 
             
             Begin by analyzing the chapter content thoroughly to extract key concepts, terms, and themes that can be transformed into question formats. 
             
-            End the generated MCQs with a summary statement of the chapter's main subject to reinforce learning.""")
+            End the generated MCQs with a summary statement of the chapter's main subject to reinforce learning.
+            and make the output form in json form like thie example : 
+            {{
+            "question":"Which of the following is not one of the characteristics of a data communication system?",
+            "optionA":"Delivery",
+            "optionB":"Accuracy",
+            "optionC":"Jitter",
+            "optionD":"All of the choices are correct",
+            "correctAnswer":"optionD"
+            }
+            }""".format(difficulty_level))
         return response
 
     # clear the index
