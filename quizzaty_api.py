@@ -9,6 +9,7 @@ import uvicorn
 from pydantic import BaseModel
 from typing import Annotated
 import time
+import json
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 # response of the model
@@ -191,7 +192,7 @@ async def predict(file: Annotated[UploadFile, File()]) -> Prediction:
     json = graphrag.extract_json_from_response(response_answer)
     print("extract_json_from_response : done")
     graphrag.clear_neo4j()
-    return Prediction(response_answer=json)
+    return Prediction(response_answer=str(json))
 
 
 # load the model asynchronously on startup
