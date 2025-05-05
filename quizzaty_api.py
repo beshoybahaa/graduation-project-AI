@@ -130,16 +130,19 @@ class graphRAG:
         if self.index:
             self.index = None
     
-    # def extract_json_from_response(self, response):
-    #     # Extract the JSON data from the response string
-    #     data = response.split("{{")[1]
-    #     try:
-    #         json_data = data.split("}{")
-    #         json_data = "{"+json_data[1].split("}")[0]+"}"
-    #         return json_data
-    #     except Exception as e:
-    #         print(f"Error extracting JSON: {str(e)}")
-    #         return None
+    def extract_json_from_response(self, response):
+        # Use regular expression to extract the JSON content between ```json and ```
+        match = re.search(r"```json\s*(\[.*?\])\s*```", response, re.DOTALL)
+        if match:
+            json_content = match.group(1)
+            try:
+                # Parse the JSON string to a Python object
+                data = json.loads(json_content)
+            except json.JSONDecodeError as e:
+                print(f"Failed to decode JSON: {e}")
+        else:
+            print("No valid JSON block found in the text.")
+        return data
 
 # import the libraries
 from llama_index.core import VectorStoreIndex
@@ -152,6 +155,8 @@ from datetime import datetime
 from llama_index.core import StorageContext
 import tempfile
 import shutil
+import json
+import re
 
 # create the app
 app = FastAPI()
@@ -182,10 +187,10 @@ async def predict(file: Annotated[UploadFile, File()]) -> Prediction:
     test= await graphrag.prediction()
     print(type(test))
     response_answer = str(test)
-    # json = graphrag.extract_json_from_response(response_answer)
-    # print("extract_json_from_response : done")
+    json = graphrag.extract_json_from_response(response_answer)
+    print("extract_json_from_response : done")
     graphrag.clear_neo4j()
-    return Prediction(response_answer=response_answer)
+    return Prediction(response_answer=json)
 
 
 # load the model asynchronously on startup
