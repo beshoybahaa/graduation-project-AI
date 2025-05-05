@@ -116,11 +116,11 @@ class graphRAG:
             and make the output form in json form like thie example : 
             {{
             "question":"Which of the following is not one of the characteristics of a data communication system?",
-            "optionA":"Delivery",
-            "optionB":"Accuracy",
-            "optionC":"Jitter",
-            "optionD":"All of the choices are correct",
-            "correctAnswer":"optionD"
+            "answerA":"Delivery",
+            "answerB":"Accuracy",
+            "answerC":"Jitter",
+            "answerD":"All of the choices are correct",
+            "correctAnswer":"answerD"
             }}""")
         return response
 
@@ -131,18 +131,19 @@ class graphRAG:
             self.index = None
     
     def extract_json_from_response(self, response):
-        # Use regular expression to extract the JSON content between ```json and ```
         match = re.search(r"```json\s*(\[.*?\])\s*```", response, re.DOTALL)
         if match:
             json_content = match.group(1)
             try:
-                # Parse the JSON string to a Python object
+                # Parse JSON string to ensure it's valid
                 data = json.loads(json_content)
+                return json.dumps(data)  # Convert list back to JSON string
             except json.JSONDecodeError as e:
                 print(f"Failed to decode JSON: {e}")
+                return None
         else:
             print("No valid JSON block found in the text.")
-        return data
+            return None
 
 # import the libraries
 from llama_index.core import VectorStoreIndex
