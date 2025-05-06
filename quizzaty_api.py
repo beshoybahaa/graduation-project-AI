@@ -131,20 +131,35 @@ class graphRAG:
         if self.index:
             self.index = None
     
-    def extract_json_from_response(self, response):
-        match = re.search(r"```json\s*(\[.*?\])\s*```", response, re.DOTALL)
-        if match:
-            json_content = match.group(1)
+    def extract_json_from_response(self,response: str):
+        # Match individual JSON objects inside brackets
+        object_matches = re.findall(r'{[^{}]*?(?:"[^"]*":\s*"[^"]*?",?)*[^{}]*?}', response, re.DOTALL)
+    
+        valid_objects = []
+        for obj_str in object_matches:
             try:
-                # Parse JSON string to ensure it's valid
-                data = json.loads(json_content)
-                return json.dumps(data)  # Convert list back to JSON string
-            except json.JSONDecodeError as e:
-                print(f"Failed to decode JSON: {e}")
-                return None
-        else:
-            print("No valid JSON block found in the text.")
-            return None
+                obj = json.loads(obj_str)
+                valid_objects.append(obj)
+            except json.JSONDecodeError:
+                continue  # Skip invalid or incomplete objects
+    
+        return valid_objects
+    def add_to_json(self ,json_data, difficulty_str, chapter_number):
+        # Map string to integer values
+        difficulty_map = {
+            "easy": 1,
+            "medium": 2,
+            "hard": 3
+        }
+    
+        # Get the corresponding numeric value
+        difficulty_value = difficulty_map.get(difficulty_str.lower(), 1)  # default to 0 if not found
+    
+        for item in json_data:
+            item["difficulty"] = difficulty_value
+            item["chapterNo"] = chapter_number
+    
+        return json_data
 
 # import the libraries
 from llama_index.core import VectorStoreIndex
@@ -189,7 +204,8 @@ async def predict(file: Annotated[UploadFile, File()]) -> Prediction:
     test= await graphrag.prediction()
     print(type(test))
     response_answer = str(test)
-    json = graphrag.extract_json_from_response(response_answer)
+    json_data = graphrag.extract_json_from_response(response_answer)
+    json_data = graphrag.add_to_json(json_data,"easy",1)
     print("extract_json_from_response : done")
     graphrag.clear_neo4j()
     return Prediction(response_answer=str(json))
