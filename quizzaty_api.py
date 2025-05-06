@@ -64,7 +64,7 @@ class graphRAG:
         documents = SimpleDirectoryReader(path).load_data()
         return documents
 
-    def index_doc(self, doc, path):
+    async def index_doc(self, doc, path):
 
         # Disable embedding of KG nodes (since SimpleGraphStore doesn't support vector queries)
         self.index = PropertyGraphIndex.from_documents(
@@ -198,7 +198,7 @@ async def predict(file: Annotated[UploadFile, File()]) -> Prediction:
     print("load_model : done")
     document = graphrag.load_doc(file,path)
     print("load_doc : done")
-    graphrag.index_doc(document,path)
+    await graphrag.index_doc(document,path)
     print("index_doc : done")
     graphrag.load_index(path)
     print("load_index : done")
