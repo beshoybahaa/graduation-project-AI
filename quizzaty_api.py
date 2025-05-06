@@ -65,16 +65,20 @@ class graphRAG:
         return documents
 
     async def index_doc(self, doc, path):
+        loop = asyncio.get_event_loop()
 
-        # Disable embedding of KG nodes (since SimpleGraphStore doesn't support vector queries)
-        self.index = PropertyGraphIndex.from_documents(
-            doc,
-            llm=self.llm_graph,
-            embed_model=self.embedding_model,
-            show_progress=True,)
-        
+        def create_index():
+            return PropertyGraphIndex.from_documents(
+                doc,
+                llm=self.llm_graph,
+                embed_model=self.embedding_model,
+                show_progress=True,
+            )
+
+        self.index = await loop.run_in_executor(None, create_index)
+
         self.index.storage_context.persist(persist_dir="./storage")
-    
+
         return self.index
 
     # load the index
@@ -170,11 +174,13 @@ from llama_index.core import StorageContext, load_index_from_storage
 
 import os
 from datetime import datetime
-from llama_index.core import StorageContext
 import tempfile
 import shutil
 import json
 import re
+
+import asyncio
+from functools import partial
 
 # create the app
 app = FastAPI()
