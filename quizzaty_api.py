@@ -202,7 +202,7 @@ async def predict(file: Annotated[UploadFile, File()]) -> Prediction:
     print("index_doc : done")
     graphrag.load_index(path)
     print("load_index : done")
-    json_data_all = {}
+    json_data_all = []
     for i in ["easy", "medium", "hard"]:
         test= await graphrag.prediction(i)
         print(type(test))
@@ -210,9 +210,10 @@ async def predict(file: Annotated[UploadFile, File()]) -> Prediction:
         json_data = graphrag.extract_json_from_response(response_answer)
         print("extract_json_from_response : done")
         json_data = graphrag.add_to_json(json_data,i,1)
-        print("extract_json_from_response : done")
-        json_data_all = {**json_data, **json_data_all}
+        print("add to json : done")
+        json_data_all.extend(json_data)
         print(f"difficulty {i}: done")
+        time.sleep(3)
     graphrag.clear_neo4j()
     return JSONResponse(content=json_data_all)
 
