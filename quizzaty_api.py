@@ -205,10 +205,11 @@ async def predict(file: Annotated[UploadFile, File()]) -> Prediction:
     print(type(test))
     response_answer = str(test)
     json_data = graphrag.extract_json_from_response(response_answer)
+    print("extract_json_from_response : done")
     json_data = graphrag.add_to_json(json_data,"easy",1)
     print("extract_json_from_response : done")
     graphrag.clear_neo4j()
-    return json_data
+    return Prediction(str(json_data))
 
 
 # load the model asynchronously on startup
