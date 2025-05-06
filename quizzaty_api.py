@@ -67,18 +67,29 @@ class graphRAG:
     async def index_doc(self, doc, path):
         loop = asyncio.get_event_loop()
 
-        def create_index():
-            return PropertyGraphIndex.from_documents(
-                doc,
-                llm=self.llm_graph,
-                embed_model=self.embedding_model,
-                show_progress=True,
-            )
+        # Split the document into 5 chunks
+        chunk_size = ceil(len(doc) / 5)
+        doc_chunks = [doc[i:i + chunk_size] for i in range(0, len(doc), chunk_size)]
 
-        self.index = await loop.run_in_executor(None, create_index)
+        def create_index_chunked():
+            index = None
+            for i, chunk in enumerate(doc_chunks):
+                print(f"Indexing chunk {i + 1}/5")
+                partial_index = PropertyGraphIndex.from_documents(
+                    chunk,
+                    llm=self.llm_graph,
+                    embed_model=self.embedding_model,
+                    show_progress=True,
+                )
+                if index is None:
+                    index = partial_index
+                else:
+                    index.graph_store.merge(partial_index.graph_store)
+            return index
+
+        self.index = await loop.run_in_executor(None, create_index_chunked)
 
         self.index.storage_context.persist(persist_dir="./storage")
-
         return self.index
 
     # load the index
@@ -178,6 +189,7 @@ import tempfile
 import shutil
 import json
 import re
+from math import ceil
 
 import asyncio
 from functools import partial
