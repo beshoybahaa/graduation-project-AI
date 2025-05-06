@@ -11,6 +11,7 @@ from typing import Annotated
 import time
 import json
 from tenacity import retry, stop_after_attempt, wait_exponential
+from fastapi.responses import JSONResponse
 
 # response of the model
 class Prediction(BaseModel):
@@ -209,7 +210,7 @@ async def predict(file: Annotated[UploadFile, File()]) -> Prediction:
     json_data = graphrag.add_to_json(json_data,"easy",1)
     print("extract_json_from_response : done")
     graphrag.clear_neo4j()
-    return Prediction(str(json_data))
+    return JSONResponse(content=json_data)
 
 
 # load the model asynchronously on startup
