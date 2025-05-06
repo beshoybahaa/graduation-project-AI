@@ -65,27 +65,22 @@ class graphRAG:
         return documents
 
     def index_doc(self, doc, path):
-        try:
-            # Create storage context
-            storage_context = StorageContext.from_defaults()
-            
-            # Create vector store index
-            self.index = VectorStoreIndex.from_documents(
-                doc,
-                storage_context=storage_context,
-                embed_model=self.embedding_model,
-                show_progress=True
-            )
-            return self.index
-        except Exception as e:
-            print(f"Error during indexing: {str(e)}")
-            raise
+
+        # Disable embedding of KG nodes (since SimpleGraphStore doesn't support vector queries)
+        self.index = PropertyGraphIndex.from_documents(
+            doc,
+            llm=self.llm_graph,
+            embed_model=self.embedding_model,
+            show_progress=True,)
+        
+        self.index.storage_context.persist(persist_dir="./storage")
+    
+        return self.index
 
     # load the index
     def load_index(self,path):
         self.query_engine = self.index.as_query_engine(
             llm=self.llm_questions,
-            similarity_top_k=3
         )
         return
         
@@ -168,6 +163,10 @@ from dotenv import load_dotenv
 from llama_index.core import SimpleDirectoryReader
 from llama_index.llms.groq import Groq
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.core.graph_stores import SimpleGraphStore
+from llama_index.core import PropertyGraphIndex
+from llama_index.core import StorageContext, load_index_from_storage
+
 import os
 from datetime import datetime
 from llama_index.core import StorageContext
