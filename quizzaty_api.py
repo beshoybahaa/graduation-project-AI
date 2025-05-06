@@ -84,7 +84,7 @@ class graphRAG:
                 if index is None:
                     index = partial_index
                 else:
-                    index.graph_store.merge(partial_index.graph_store)
+                    index._graph_store.merge(partial_index._graph_store)
             return index
 
         self.index = await loop.run_in_executor(None, create_index_chunked)
