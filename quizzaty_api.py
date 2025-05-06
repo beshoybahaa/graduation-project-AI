@@ -125,6 +125,7 @@ class graphRAG:
     def clear_neo4j(self):
         # Clear the index
         if self.index:
+            shutil.rmtree("./storage")
             self.index = None
     
     def extract_json_from_response(self,response: str):
