@@ -74,17 +74,33 @@ class graphRAG:
         def create_index_chunked():
             index = None
             for i, chunk in enumerate(doc_chunks):
-                print(f"Indexing chunk {i + 1}/5")
+                print(f"Processing chunk {i + 1}/5 — length: {len(chunk)}")
+
+                if not chunk:
+                    print("Skipping empty chunk.")
+                    continue
+
+                if self.llm_graph is None:
+                    raise ValueError("LLM (self.llm_graph) is not initialized.")
+
+                if self.embedding_model is None:
+                    raise ValueError("Embedding model is not initialized.")
+
                 partial_index = PropertyGraphIndex.from_documents(
                     chunk,
                     llm=self.llm_graph,
                     embed_model=self.embedding_model,
                     show_progress=True,
                 )
+
                 if index is None:
                     index = partial_index
                 else:
                     index._graph_store.merge(partial_index._graph_store)
+
+            if index is None:
+                raise ValueError("Failed to create index from any chunk.")
+
             return index
 
         self.index = await loop.run_in_executor(None, create_index_chunked)
