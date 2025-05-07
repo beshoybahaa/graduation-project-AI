@@ -29,8 +29,8 @@ class graphRAG:
     llm_questions = None
     embedding_model = None
     index = None
-    deepseek_r1_distill_llama_70b = "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"
-    gemma2_9b_it = "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"
+    deepseek_r1_distill_llama_70b = "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"
+    gemma2_9b_it = "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"
     doc = None
     query_engine = None
     temp_dir = None
