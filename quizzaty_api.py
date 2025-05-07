@@ -31,12 +31,15 @@ class input_body(BaseModel):
 # graphRAG class
 class graphRAG:
     # variables
-    llm_graph = None
+    llm_graph_1 = None
+    llm_graph_2 = None
+    llm_graph= None
     llm_questions = None
     embedding_model = None
     index = None
     deepseek_r1_distill_llama_70b = "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"
-    gemma2_9b_it = "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"
+    questions_beshoy = "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"
+    questions_kerolos = "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"
     doc = None
     query_engine = None
     temp_dir = None
@@ -57,7 +60,8 @@ class graphRAG:
         self.llm_questions = Groq(model=model_name_questions, api_key=self.deepseek_r1_distill_llama_70b,max_retries=0)
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
         model_name_graph = "llama-guard-3-8b"
-        self.llm_graph = Groq(model=model_name_graph, api_key=self.gemma2_9b_it)
+        self.llm_graph_1 = Groq(model=model_name_graph, api_key=self.questions_beshoy)
+        self.llm_graph_2 = Groq(model=model_name_graph, api_key=self.questions_kerolos)
         return
 
     # load the uploaded document
@@ -85,7 +89,12 @@ class graphRAG:
 
             for i, chunk in enumerate(doc_chunks):
                 print(f"Processing chunk {i + 5}/5 — length: {len(chunk)}")
-
+                if(i % 2 == 0):
+                    # Use the first LLM for even chunks
+                    self.llm_graph = self.llm_graph_1
+                else:
+                    # Use the second LLM for odd chunks
+                    self.llm_graph = self.llm_graph_2
                 # Each chunk writes into the same graph store
                 PropertyGraphIndex.from_documents(
                     chunk,
@@ -94,7 +103,7 @@ class graphRAG:
                     storage_context=shared_storage_context,
                     show_progress=True,
                 )
-                time.sleep(10)  # Optional: Sleep to avoid overwhelming the api (rate limiting)
+                time.sleep(3)  # Optional: Sleep to avoid overwhelming the api (rate limiting)
             # After all chunks processed, create one final index
             final_index = PropertyGraphIndex(
                 storage_context=shared_storage_context,
