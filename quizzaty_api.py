@@ -88,7 +88,7 @@ class graphRAG:
             shared_storage_context = StorageContext.from_defaults(graph_store=shared_graph_store)
 
             for i, chunk in enumerate(doc_chunks):
-                print(f"Processing chunk {i + 5}/5 — length: {len(chunk)}")
+                print(f"Processing chunk {i}/5 — length: {len(chunk)}")
                 if(i % 2 == 0):
                     # Use the first LLM for even chunks
                     self.llm_graph = self.llm_graph_1
@@ -103,7 +103,7 @@ class graphRAG:
                     storage_context=shared_storage_context,
                     show_progress=True,
                 )
-                time.sleep(3)  # Optional: Sleep to avoid overwhelming the api (rate limiting)
+                time.sleep(10)  # Optional: Sleep to avoid overwhelming the api (rate limiting)
             # After all chunks processed, create one final index
             final_index = PropertyGraphIndex(
                 storage_context=shared_storage_context,
