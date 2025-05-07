@@ -56,7 +56,7 @@ class graphRAG:
         model_name_questions = "deepseek-r1-distill-llama-70b"
         self.llm_questions = Groq(model=model_name_questions, api_key=self.deepseek_r1_distill_llama_70b,max_retries=0)
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
-        model_name_graph = "llama3-70b-8192"
+        model_name_graph = "qwen-qwq-32b"
         self.llm_graph = Groq(model=model_name_graph, api_key=self.gemma2_9b_it)
         return
 
@@ -74,7 +74,7 @@ class graphRAG:
         loop = asyncio.get_event_loop()
 
         # Split the document into 5 chunks
-        chunk_size = ceil(len(doc) / 10)
+        chunk_size = ceil(len(doc) / 20)
         doc_chunks = [doc[i:i + chunk_size] for i in range(0, len(doc), chunk_size)]
 
         def create_index_shared_store():
@@ -84,7 +84,7 @@ class graphRAG:
             shared_storage_context = StorageContext.from_defaults(graph_store=shared_graph_store)
 
             for i, chunk in enumerate(doc_chunks):
-                print(f"Processing chunk {i + 1}/10 — length: {len(chunk)}")
+                print(f"Processing chunk {i + 1}/20 — length: {len(chunk)}")
 
                 # Each chunk writes into the same graph store
                 PropertyGraphIndex.from_documents(
