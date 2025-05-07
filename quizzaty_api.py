@@ -33,13 +33,17 @@ class graphRAG:
     # variables
     llm_graph_1 = None
     llm_graph_2 = None
+    llm_graph_3 = None
+    llm_graph_4 = None
     llm_graph= None
     llm_questions = None
     embedding_model = None
     index = None
     deepseek_r1_distill_llama_70b = "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"
-    questions_beshoy = "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"
-    questions_kerolos = "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"
+    questions_beshoy_1 = "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"
+    questions_beshoy_2 = "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"
+    questions_kerolos_1 = "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"
+    questions_kerolos_2 = "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"
     doc = None
     query_engine = None
     temp_dir = None
@@ -59,9 +63,11 @@ class graphRAG:
         model_name_questions = "deepseek-r1-distill-llama-70b"
         self.llm_questions = Groq(model=model_name_questions, api_key=self.deepseek_r1_distill_llama_70b,max_retries=0)
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
-        model_name_graph = "llama-guard-3-8b"
-        self.llm_graph_1 = Groq(model=model_name_graph, api_key=self.questions_beshoy)
-        self.llm_graph_2 = Groq(model=model_name_graph, api_key=self.questions_kerolos)
+        model_name_graph = "gemma2-9b-it"
+        self.llm_graph_1 = Groq(model=model_name_graph, api_key=self.questions_beshoy_1)
+        self.llm_graph_2 = Groq(model=model_name_graph, api_key=self.questions_kerolos_1)
+        self.llm_graph_3 = Groq(model=model_name_graph, api_key=self.questions_beshoy_2)
+        self.llm_graph_4 = Groq(model=model_name_graph, api_key=self.questions_kerolos_2)
         return
 
     # load the uploaded document
@@ -78,7 +84,7 @@ class graphRAG:
         loop = asyncio.get_event_loop()
 
         # Split the document into 5 chunks
-        chunk_size = ceil(len(doc) / 5)
+        chunk_size = ceil(len(doc) / 4)
         doc_chunks = [doc[i:i + chunk_size] for i in range(0, len(doc), chunk_size)]
 
         def create_index_shared_store():
@@ -88,13 +94,19 @@ class graphRAG:
             shared_storage_context = StorageContext.from_defaults(graph_store=shared_graph_store)
 
             for i, chunk in enumerate(doc_chunks):
-                print(f"Processing chunk {i}/5 — length: {len(chunk)}")
-                if(i % 2 == 0):
+                print(f"Processing chunk {i}/4 — length: {len(chunk)}")
+                if(i == 0):
                     # Use the first LLM for even chunks
                     self.llm_graph = self.llm_graph_1
-                else:
+                elif(i == 1):
                     # Use the second LLM for odd chunks
                     self.llm_graph = self.llm_graph_2
+                elif(i == 2):
+                    # Use the third LLM for even chunks
+                    self.llm_graph = self.llm_graph_3
+                else:
+                    # Use the fourth LLM for odd chunks
+                    self.llm_graph = self.llm_graph_4
                 # Each chunk writes into the same graph store
                 PropertyGraphIndex.from_documents(
                     chunk,
