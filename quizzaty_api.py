@@ -36,7 +36,7 @@ class graphRAG:
     embedding_model = None
     index = None
     deepseek_r1_distill_llama_70b = "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"
-    gemma2_9b_it = "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"
+    gemma2_9b_it = "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"
     doc = None
     query_engine = None
     temp_dir = None
