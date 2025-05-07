@@ -84,7 +84,7 @@ class graphRAG:
         loop = asyncio.get_event_loop()
 
         # Split the document into 5 chunks
-        chunk_size = ceil(len(doc) / 4)
+        chunk_size = ceil(len(doc) / 8)
         doc_chunks = [doc[i:i + chunk_size] for i in range(0, len(doc), chunk_size)]
 
         def create_index_shared_store():
@@ -94,14 +94,14 @@ class graphRAG:
             shared_storage_context = StorageContext.from_defaults(graph_store=shared_graph_store)
 
             for i, chunk in enumerate(doc_chunks):
-                print(f"Processing chunk {i}/4 — length: {len(chunk)}")
-                if(i == 0):
+                print(f"Processing chunk {i}/8 — length: {len(chunk)}")
+                if(i == 0 or i==4):
                     # Use the first LLM for even chunks
                     self.llm_graph = self.llm_graph_1
-                elif(i == 1):
+                elif(i == 1 or i==5):
                     # Use the second LLM for odd chunks
                     self.llm_graph = self.llm_graph_2
-                elif(i == 2):
+                elif(i == 2 or i==6):
                     # Use the third LLM for even chunks
                     self.llm_graph = self.llm_graph_3
                 else:
@@ -115,7 +115,7 @@ class graphRAG:
                     storage_context=shared_storage_context,
                     show_progress=True,
                 )
-                time.sleep(10)  # Optional: Sleep to avoid overwhelming the api (rate limiting)
+                time.sleep(60)  # Optional: Sleep to avoid overwhelming the api (rate limiting)
             # After all chunks processed, create one final index
             final_index = PropertyGraphIndex(
                 storage_context=shared_storage_context,
