@@ -39,11 +39,12 @@ class graphRAG:
     llm_questions = None
     embedding_model = None
     index = None
-    deepseek_r1_distill_llama_70b = "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"
-    questions_beshoy_1 = "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"
-    questions_beshoy_2 = "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"
-    questions_kerolos_1 = "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"
-    questions_kerolos_2 = "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"
+    llm_api = "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"
+    # deepseek_r1_distill_llama_70b = "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"
+    # questions_beshoy_1 = "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"
+    # questions_beshoy_2 = "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"
+    # questions_kerolos_1 = "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"
+    # questions_kerolos_2 = "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"
     doc = None
     query_engine = None
     temp_dir = None
@@ -60,14 +61,15 @@ class graphRAG:
 
     # load the model if not loaded
     def load_model(self):
-        model_name_questions = "deepseek-r1-distill-llama-70b"
-        self.llm_questions = Groq(model=model_name_questions, api_key=self.deepseek_r1_distill_llama_70b,max_retries=0)
+        # model_name_questions = "deepseek-r1-distill-llama-70b"
+        model_name_questions = "llama3-8b-8192"
+        self.llm_questions = Groq(model=model_name_questions, api_key=self.llm_api,max_retries=0)
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
-        model_name_graph = "gemma2-9b-it"
-        self.llm_graph_1 = Groq(model=model_name_graph, api_key=self.questions_beshoy_1)
-        self.llm_graph_2 = Groq(model=model_name_graph, api_key=self.questions_kerolos_1)
-        self.llm_graph_3 = Groq(model=model_name_graph, api_key=self.questions_beshoy_2)
-        self.llm_graph_4 = Groq(model=model_name_graph, api_key=self.questions_kerolos_2)
+        # model_name_graph = "llama3-8b-8192"
+        # self.llm_graph_1 = Groq(model=model_name_graph, api_key=self.questions_beshoy_1)
+        # self.llm_graph_2 = Groq(model=model_name_graph, api_key=self.questions_kerolos_1)
+        # self.llm_graph_3 = Groq(model=model_name_graph, api_key=self.questions_beshoy_2)
+        # self.llm_graph_4 = Groq(model=model_name_graph, api_key=self.questions_kerolos_2)
         return
 
     # load the uploaded document
@@ -80,53 +82,68 @@ class graphRAG:
         documents = SimpleDirectoryReader(path).load_data()
         return documents
 
+    # async def index_doc(self, doc, path):
+    #     loop = asyncio.get_event_loop()
+
+    #     # Split the document into 5 chunks
+    #     chunk_size = ceil(len(doc) / 8)
+    #     doc_chunks = [doc[i:i + chunk_size] for i in range(0, len(doc), chunk_size)]
+
+    #     def create_index_shared_store():
+    #         print("Initializing shared SimpleGraphStore...")
+    #         # Create a shared in-memory graph store
+    #         shared_graph_store = SimpleGraphStore()
+    #         shared_storage_context = StorageContext.from_defaults(graph_store=shared_graph_store)
+
+    #         for i, chunk in enumerate(doc_chunks):
+    #             print(f"Processing chunk {i}/8 — length: {len(chunk)}")
+    #             if(i == 0 or i==4):
+    #                 # Use the first LLM for even chunks
+    #                 self.llm_graph = self.llm_graph_1
+    #             elif(i == 1 or i==5):
+    #                 # Use the second LLM for odd chunks
+    #                 self.llm_graph = self.llm_graph_2
+    #             elif(i == 2 or i==6):
+    #                 # Use the third LLM for even chunks
+    #                 self.llm_graph = self.llm_graph_3
+    #             else:
+    #                 # Use the fourth LLM for odd chunks
+    #                 self.llm_graph = self.llm_graph_4
+    #             # Each chunk writes into the same graph store
+    #             PropertyGraphIndex.from_documents(
+    #                 chunk,
+    #                 llm=self.llm_graph,
+    #                 embed_model=self.embedding_model,
+    #                 storage_context=shared_storage_context,
+    #                 show_progress=True,
+    #             )
+    #             time.sleep(60)  # Optional: Sleep to avoid overwhelming the api (rate limiting)
+    #         # After all chunks processed, create one final index
+    #         final_index = PropertyGraphIndex(
+    #             storage_context=shared_storage_context,
+    #             llm=self.llm_graph,
+    #             embed_model=self.embedding_model,
+    #         )
+
+    #         return final_index
+
+    #     self.index = await loop.run_in_executor(None, create_index_shared_store)
+
+    #     self.index.storage_context.persist(persist_dir="./storage")
+    #     return self.index
+    
     async def index_doc(self, doc, path):
-        loop = asyncio.get_event_loop()
-
-        # Split the document into 5 chunks
-        chunk_size = ceil(len(doc) / 8)
-        doc_chunks = [doc[i:i + chunk_size] for i in range(0, len(doc), chunk_size)]
-
-        def create_index_shared_store():
-            print("Initializing shared SimpleGraphStore...")
-            # Create a shared in-memory graph store
-            shared_graph_store = SimpleGraphStore()
-            shared_storage_context = StorageContext.from_defaults(graph_store=shared_graph_store)
-
-            for i, chunk in enumerate(doc_chunks):
-                print(f"Processing chunk {i}/8 — length: {len(chunk)}")
-                if(i == 0 or i==4):
-                    # Use the first LLM for even chunks
-                    self.llm_graph = self.llm_graph_1
-                elif(i == 1 or i==5):
-                    # Use the second LLM for odd chunks
-                    self.llm_graph = self.llm_graph_2
-                elif(i == 2 or i==6):
-                    # Use the third LLM for even chunks
-                    self.llm_graph = self.llm_graph_3
-                else:
-                    # Use the fourth LLM for odd chunks
-                    self.llm_graph = self.llm_graph_4
-                # Each chunk writes into the same graph store
-                PropertyGraphIndex.from_documents(
-                    chunk,
-                    llm=self.llm_graph,
-                    embed_model=self.embedding_model,
-                    storage_context=shared_storage_context,
-                    show_progress=True,
-                )
-                time.sleep(60)  # Optional: Sleep to avoid overwhelming the api (rate limiting)
-            # After all chunks processed, create one final index
-            final_index = PropertyGraphIndex(
-                storage_context=shared_storage_context,
-                llm=self.llm_graph,
+        print("Initializing shared SimpleGraphStore...")
+        # Create a shared in-memory graph store
+        shared_graph_store = SimpleGraphStore()
+        shared_storage_context = StorageContext.from_defaults(graph_store=shared_graph_store)
+        self.index = PropertyGraphIndex.from_documents(
+                doc,
+                llm=self.llm_questions,
                 embed_model=self.embedding_model,
+                storage_context=shared_storage_context,
+                show_progress=True,
             )
-
-            return final_index
-
-        self.index = await loop.run_in_executor(None, create_index_shared_store)
-
         self.index.storage_context.persist(persist_dir="./storage")
         return self.index
 
