@@ -74,7 +74,7 @@ class graphRAG:
         loop = asyncio.get_event_loop()
 
         # Split the document into 5 chunks
-        chunk_size = ceil(len(doc) / 5)
+        chunk_size = ceil(len(doc) / 10)
         doc_chunks = [doc[i:i + chunk_size] for i in range(0, len(doc), chunk_size)]
 
         def create_index_shared_store():
@@ -84,7 +84,7 @@ class graphRAG:
             shared_storage_context = StorageContext.from_defaults(graph_store=shared_graph_store)
 
             for i, chunk in enumerate(doc_chunks):
-                print(f"Processing chunk {i + 1}/5 — length: {len(chunk)}")
+                print(f"Processing chunk {i + 1}/10 — length: {len(chunk)}")
 
                 # Each chunk writes into the same graph store
                 PropertyGraphIndex.from_documents(
