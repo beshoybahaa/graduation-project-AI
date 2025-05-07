@@ -132,7 +132,7 @@ class graphRAG:
     #     self.index.storage_context.persist(persist_dir="./storage")
     #     return self.index
     
-    async def index_doc(self, doc, path):
+    def index_doc(self, doc, path):
         print("Initializing shared SimpleGraphStore...")
         # Create a shared in-memory graph store
         shared_graph_store = SimpleGraphStore()
@@ -288,7 +288,7 @@ async def predict(file: Annotated[UploadFile, File()]):
             )
 
         try:
-            await graphrag.index_doc(document, path)
+            graphrag.index_doc(document, path)
             print("index_doc : done")
         except Exception as e:
             return JSONResponse(
