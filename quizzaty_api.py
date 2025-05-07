@@ -94,7 +94,7 @@ class graphRAG:
                     storage_context=shared_storage_context,
                     show_progress=True,
                 )
-                time.sleep(3)  # Optional: Sleep to avoid overwhelming the api (rate limiting)
+                time.sleep(10)  # Optional: Sleep to avoid overwhelming the api (rate limiting)
             # After all chunks processed, create one final index
             final_index = PropertyGraphIndex(
                 storage_context=shared_storage_context,
