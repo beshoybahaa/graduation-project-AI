@@ -71,39 +71,34 @@ class graphRAG:
         chunk_size = ceil(len(doc) / 5)
         doc_chunks = [doc[i:i + chunk_size] for i in range(0, len(doc), chunk_size)]
 
-        def create_index_chunked():
-            index = None
+        def create_index_shared_store():
+            print("Initializing shared SimpleGraphStore...")
+            # Create a shared in-memory graph store
+            shared_graph_store = SimpleGraphStore()
+            shared_storage_context = StorageContext.from_defaults(graph_store=shared_graph_store)
+
             for i, chunk in enumerate(doc_chunks):
                 print(f"Processing chunk {i + 1}/5 — length: {len(chunk)}")
 
-                if not chunk:
-                    print("Skipping empty chunk.")
-                    continue
-
-                if self.llm_graph is None:
-                    raise ValueError("LLM (self.llm_graph) is not initialized.")
-
-                if self.embedding_model is None:
-                    raise ValueError("Embedding model is not initialized.")
-
-                partial_index = PropertyGraphIndex.from_documents(
+                # Each chunk writes into the same graph store
+                PropertyGraphIndex.from_documents(
                     chunk,
                     llm=self.llm_graph,
                     embed_model=self.embedding_model,
+                    storage_context=shared_storage_context,
                     show_progress=True,
                 )
 
-                if index is None:
-                    index = partial_index
-                else:
-                    index._graph_store.merge(partial_index._graph_store)
+            # After all chunks processed, create one final index
+            final_index = PropertyGraphIndex(
+                storage_context=shared_storage_context,
+                llm=self.llm_graph,
+                embed_model=self.embedding_model,
+            )
 
-            if index is None:
-                raise ValueError("Failed to create index from any chunk.")
+            return final_index
 
-            return index
-
-        self.index = await loop.run_in_executor(None, create_index_chunked)
+        self.index = await loop.run_in_executor(None, create_index_shared_store)
 
         self.index.storage_context.persist(persist_dir="./storage")
         return self.index
