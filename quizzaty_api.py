@@ -49,15 +49,15 @@ class graphRAG:
     query_engine = None
     temp_dir = None
     
-    def __init__(self):
-        # Create a temporary directory for storage
-        self.temp_dir = tempfile.mkdtemp()
+    # def __init__(self):
+    #     # Create a temporary directory for storage
+    #     self.temp_dir = tempfile.mkdtemp()
         
-    def __del__(self):
-        # Clean up temporary directory when object is destroyed
-        if self.temp_dir and os.path.exists(self.temp_dir):
-            import shutil
-            shutil.rmtree(self.temp_dir)
+    # def __del__(self):
+    #     # Clean up temporary directory when object is destroyed
+    #     if self.temp_dir and os.path.exists(self.temp_dir):
+    #         import shutil
+    #         shutil.rmtree(self.temp_dir)
 
     # load the model if not loaded
     def load_model(self):
