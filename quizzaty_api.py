@@ -1,6 +1,6 @@
-# import asyncio
-# import nest_asyncio
-# nest_asyncio.apply()
+import asyncio
+import nest_asyncio
+nest_asyncio.apply()
 
 from typing import Union
 from fastapi import FastAPI, UploadFile, Form, File
