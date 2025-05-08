@@ -49,10 +49,10 @@ class graphRAG:
     query_engine = None
     temp_dir = None
     
-    def __init__(self):
+    # def __init__(self):
         # Create temp directories that will be used throughout the lifecycle
-        self.storage_dir = tempfile.mkdtemp()
-        self.upload_dir = tempfile.mkdtemp()
+        # self.storage_dir = tempfile.mkdtemp()
+        # self.upload_dir = tempfile.mkdtemp()
         
         
     # def __del__(self):
@@ -147,7 +147,7 @@ class graphRAG:
                 show_progress=True,
                 use_async=True
             )
-        self.index.storage_context.persist(persist_dir=self.storage_dir)
+        # self.index.storage_context.persist(persist_dir=self.storage_dir)
         return self.index
 
     # load the index
@@ -197,10 +197,10 @@ class graphRAG:
     # clear the index
     def clear_neo4j(self):
         # Clean up both temporary directories
-        if self.storage_dir and os.path.exists(self.storage_dir):
-            shutil.rmtree(self.storage_dir)
-        if self.upload_dir and os.path.exists(self.upload_dir):
-            shutil.rmtree(self.upload_dir)
+        # if self.storage_dir and os.path.exists(self.storage_dir):
+        #     shutil.rmtree(self.storage_dir)
+        # if self.upload_dir and os.path.exists(self.upload_dir):
+        #     shutil.rmtree(self.upload_dir)
         self.index = None
     
     def extract_json_from_response(self,response: str):
