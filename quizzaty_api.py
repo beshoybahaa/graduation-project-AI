@@ -63,7 +63,7 @@ class graphRAG:
     def load_model(self):
         # model_name_questions = "deepseek-r1-distill-llama-70b"
         model_name_questions = "deepseek-r1-distill-llama-70b"
-        self.llm_questions = Groq(model=model_name_questions, api_key=self.llm_api,max_retries=0)
+        self.llm_questions = Groq(model=model_name_questions, api_key=self.llm_api,max_retries=2)
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
         # model_name_graph = "llama3-8b-8192"
         # self.llm_graph_1 = Groq(model=model_name_graph, api_key=self.questions_beshoy_1)
