@@ -132,7 +132,7 @@ class graphRAG:
     #     self.index.storage_context.persist(persist_dir="./storage")
     #     return self.index
     
-    def index_doc(self, doc, path):
+    async def index_doc(self, doc, path):
         print("Initializing shared SimpleGraphStore...")
         # Create a shared in-memory graph store
         shared_graph_store = SimpleGraphStore()
@@ -143,6 +143,7 @@ class graphRAG:
                 embed_model=self.embedding_model,
                 storage_context=shared_storage_context,
                 show_progress=True,
+                use_async=True
             )
         self.index.storage_context.persist(persist_dir="./storage")
         return self.index
@@ -237,6 +238,7 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.core.graph_stores import SimpleGraphStore
 from llama_index.core import PropertyGraphIndex
 from llama_index.core import StorageContext, load_index_from_storage
+from llama_index.core.async_utils import asyncio_run
 
 import os
 from datetime import datetime
@@ -288,7 +290,8 @@ async def predict(file: Annotated[UploadFile, File()]):
             )
 
         try:
-            graphrag.index_doc(document, path)
+            # graphrag.index_doc(document, path)
+            asyncio_run(graphrag.index_doc(document, path))
             print("index_doc : done")
         except Exception as e:
             return JSONResponse(
