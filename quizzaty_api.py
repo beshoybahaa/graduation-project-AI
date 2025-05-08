@@ -62,7 +62,7 @@ class graphRAG:
     # load the model if not loaded
     def load_model(self):
         # model_name_questions = "deepseek-r1-distill-llama-70b"
-        model_name_questions = "llama3-8b-8192"
+        model_name_questions = "llama-3.1-8b-instant"
         self.llm_questions = Groq(model=model_name_questions, api_key=self.llm_api,max_retries=0)
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
         # model_name_graph = "llama3-8b-8192"
