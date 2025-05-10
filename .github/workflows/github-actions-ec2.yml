@@ -1,42 +1,43 @@
-name: Push-To-EC2
+name: Deploy Python to EC2 with PM2
+
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
   deploy:
-    name: Deploy to EC2 on main branch push
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout the files
-        uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.x"
+          python-version: '3.x'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Deploy to Server
+      - name: Deploy to EC2 via SSH
         uses: easingthemes/ssh-deploy@main
         with:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_KEY }}
           REMOTE_HOST: ${{ secrets.HOST_DNS }}
           REMOTE_USER: ${{ secrets.USERNAME }}
           TARGET: ${{ secrets.TARGET_DIR }}
+          SOURCE: "./"
+          EXCLUDE: ".git/*, .github/*, .env, *.pyc, __pycache__/*"
 
-      - name: Executing Remote SSH Commands
-        uses: appleboy/ssh-action@v0.1.10
+      - name: Restart application with PM2
+        uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.HOST_DNS }}
-          key: ${{ secrets.SSH_KEY }}
           username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
           script: |
             cd ${{ secrets.TARGET_DIR }}
+            if [ -f requirements.txt ]; then pip3 install -r requirements.txt; fi
             pm2 restart ai
