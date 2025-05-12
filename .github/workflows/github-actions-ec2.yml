@@ -34,4 +34,5 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             cd ${{ secrets.TARGET_DIR }}
+            git pull
             pm2 restart ai
