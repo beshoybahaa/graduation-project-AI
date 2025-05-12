@@ -35,4 +35,5 @@ jobs:
           script: |
             cd ${{ secrets.TARGET_DIR }}
             git pull
-            pm2 restart all
+            cd ../
+            pm2 restart ai
