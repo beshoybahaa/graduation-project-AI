@@ -39,7 +39,7 @@ class graphRAG:
     llm_questions = None
     embedding_model = None
     index = None
-    llm_api = "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"
+    llm_api = "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"
     # deepseek_r1_distill_llama_70b = "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"
     # questions_beshoy_1 = "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"
     # questions_beshoy_2 = "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"
@@ -84,76 +84,66 @@ class graphRAG:
         documents = SimpleDirectoryReader(path).load_data()
         return documents
 
-    # async def index_doc(self, doc, path):
-    #     loop = asyncio.get_event_loop()
-
-    #     # Split the document into 5 chunks
-    #     chunk_size = ceil(len(doc) / 8)
-    #     doc_chunks = [doc[i:i + chunk_size] for i in range(0, len(doc), chunk_size)]
-
-    #     def create_index_shared_store():
-    #         print("Initializing shared SimpleGraphStore...")
-    #         # Create a shared in-memory graph store
-    #         shared_graph_store = SimpleGraphStore()
-    #         shared_storage_context = StorageContext.from_defaults(graph_store=shared_graph_store)
-
-    #         for i, chunk in enumerate(doc_chunks):
-    #             print(f"Processing chunk {i}/8 — length: {len(chunk)}")
-    #             if(i == 0 or i==4):
-    #                 # Use the first LLM for even chunks
-    #                 self.llm_graph = self.llm_graph_1
-    #             elif(i == 1 or i==5):
-    #                 # Use the second LLM for odd chunks
-    #                 self.llm_graph = self.llm_graph_2
-    #             elif(i == 2 or i==6):
-    #                 # Use the third LLM for even chunks
-    #                 self.llm_graph = self.llm_graph_3
-    #             else:
-    #                 # Use the fourth LLM for odd chunks
-    #                 self.llm_graph = self.llm_graph_4
-    #             # Each chunk writes into the same graph store
-    #             PropertyGraphIndex.from_documents(
-    #                 chunk,
-    #                 llm=self.llm_graph,
-    #                 embed_model=self.embedding_model,
-    #                 storage_context=shared_storage_context,
-    #                 show_progress=True,
-    #             )
-    #             time.sleep(60)  # Optional: Sleep to avoid overwhelming the api (rate limiting)
-    #         # After all chunks processed, create one final index
-    #         final_index = PropertyGraphIndex(
-    #             storage_context=shared_storage_context,
-    #             llm=self.llm_graph,
-    #             embed_model=self.embedding_model,
-    #         )
-
-    #         return final_index
-
-    #     self.index = await loop.run_in_executor(None, create_index_shared_store)
-
-    #     self.index.storage_context.persist(persist_dir="./storage")
-    #     return self.index
-    
     async def index_doc(self, doc, path):
-        print("Initializing shared SimpleGraphStore...")
-        # Create a shared in-memory graph store
-        shared_graph_store = SimpleGraphStore()
-        shared_storage_context = StorageContext.from_defaults(graph_store=shared_graph_store)
-        self.index = PropertyGraphIndex.from_documents(
-                doc,
-                llm=self.llm_questions,
-                embed_model=self.embedding_model,
+        loop = asyncio.get_event_loop()
+
+        # Split the document into 5 chunks
+        chunk_size = ceil(len(doc) / 8)
+        doc_chunks = [doc[i:i + chunk_size] for i in range(0, len(doc), chunk_size)]
+
+        def create_index_shared_store():
+            print("Initializing shared SimpleGraphStore...")
+            # Create a shared in-memory graph store
+            shared_graph_store = SimpleGraphStore()
+            shared_storage_context = StorageContext.from_defaults(graph_store=shared_graph_store)
+
+            for i, chunk in enumerate(doc_chunks):
+                print(f"Processing chunk {i}/8 — length: {len(chunk)}")
+                # Each chunk writes into the same graph store
+                PropertyGraphIndex.from_documents(
+                    chunk,
+                    llm=self.llm_questions,
+                    embed_model=self.embedding_model,
+                    storage_context=shared_storage_context,
+                    show_progress=True,
+                )
+                time.sleep(60)  # Optional: Sleep to avoid overwhelming the api (rate limiting)
+            # After all chunks processed, create one final index
+            final_index = PropertyGraphIndex(
                 storage_context=shared_storage_context,
-                show_progress=True,
-                use_async=True
+                llm=self.llm_graph,
+                embed_model=self.embedding_model,
             )
-        # self.index.storage_context.persist(persist_dir=self.storage_dir)
+
+            return final_index
+
+        self.index = await loop.run_in_executor(None, create_index_shared_store)
+
+        self.index.storage_context.persist(persist_dir="./storage")
         return self.index
+    
+    # async def index_doc(self, doc, path):
+    #     print("Initializing shared SimpleGraphStore...")
+    #     # Create a shared in-memory graph store
+    #     shared_graph_store = SimpleGraphStore()
+    #     shared_storage_context = StorageContext.from_defaults(graph_store=shared_graph_store)
+    #     self.index = PropertyGraphIndex.from_documents(
+    #             doc,
+    #             llm=self.llm_questions,
+    #             embed_model=self.embedding_model,
+    #             storage_context=shared_storage_context,
+    #             show_progress=True,
+    #             use_async=True
+    #         )
+    #     # self.index.storage_context.persist(persist_dir=self.storage_dir)
+    #     return self.index
 
     # load the index
     def load_index(self,path):
         self.query_engine = self.index.as_query_engine(
             llm=self.llm_questions,
+            embed_model=self.embedding_model,
+            storage_context=self.index.storage_context
         )
         return
         
