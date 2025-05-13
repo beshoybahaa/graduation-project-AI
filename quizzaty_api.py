@@ -76,10 +76,10 @@ class graphRAG:
 
     # load the uploaded document
     def load_doc(self,file,path):
-        file_path = f'{path}/{file.filename}.pdf'
-        # Save the uploaded file
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        # file_path = f'{path}/{file.filename}.pdf'
+        # # Save the uploaded file
+        # with open(file_path, "wb") as buffer:
+        #     shutil.copyfileobj(file.file, buffer)
         # Read documents from the temp directory
         documents = SimpleDirectoryReader(file).load_data()
         return documents
