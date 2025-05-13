@@ -76,13 +76,22 @@ class graphRAG:
 
     # load the uploaded document
     def load_doc(self,file,path):
-        # file_path = f'{path}/{file.filename}.pdf'
-        # # Save the uploaded file
-        # with open(file_path, "wb") as buffer:
-        #     shutil.copyfileobj(file.file, buffer)
-        # Read documents from the temp directory
-        documents = SimpleDirectoryReader(file).load_data()
-        return documents
+        # Create a temporary directory for file processing
+        temp_dir = tempfile.mkdtemp()
+        file_path = os.path.join(temp_dir, file.filename)
+        
+        try:
+            # Save the uploaded file
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            
+            # Read documents from the temp directory
+            documents = SimpleDirectoryReader(temp_dir).load_data()
+            return documents
+        finally:
+            # Clean up the temporary directory
+            if os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)
 
     # async def index_doc(self, doc, path):
     #     loop = asyncio.get_event_loop()
@@ -265,6 +274,7 @@ async def predict(file: Annotated[UploadFile, File()]):
         print(f"Received file: {file.filename}")
         print(f"Received path: {path}")
         
+        # Initialize models
         try:
             graphrag.load_model()
             print("load_model : done")
@@ -274,6 +284,7 @@ async def predict(file: Annotated[UploadFile, File()]):
                 content={"error": "Model Loading Error", "step": "load_model", "details": str(e)}
             )
 
+        # Load and process document
         try:
             document = graphrag.load_doc(file, path)
             print("load_doc : done")
@@ -283,9 +294,9 @@ async def predict(file: Annotated[UploadFile, File()]):
                 content={"error": "Document Loading Error", "step": "load_doc", "details": str(e)}
             )
 
+        # Index document
         try:
-            # graphrag.index_doc(document, path)
-            asyncio_run(graphrag.index_doc(document, path))
+            await graphrag.index_doc(document, path)
             print("index_doc : done")
         except Exception as e:
             return JSONResponse(
@@ -293,6 +304,7 @@ async def predict(file: Annotated[UploadFile, File()]):
                 content={"error": "Document Indexing Error", "step": "index_doc", "details": str(e)}
             )
 
+        # Load index
         try:
             graphrag.load_index(path)
             print("load_index : done")
@@ -302,6 +314,7 @@ async def predict(file: Annotated[UploadFile, File()]):
                 content={"error": "Index Loading Error", "step": "load_index", "details": str(e)}
             )
 
+        # Generate questions for each difficulty level
         json_data_all = []
         for i in ["easy", "medium", "hard"]:
             try:
@@ -314,7 +327,8 @@ async def predict(file: Annotated[UploadFile, File()]):
                 print("add to json : done")
                 json_data_all.extend(json_data)
                 print(f"difficulty {i}: done")
-                time.sleep(3)
+                # Add a small delay between API calls to avoid rate limiting
+                await asyncio.sleep(3)
             except Exception as e:
                 return JSONResponse(
                     status_code=500,
@@ -325,6 +339,7 @@ async def predict(file: Annotated[UploadFile, File()]):
                     }
                 )
 
+        # Cleanup
         try:
             graphrag.clear_neo4j()
         except Exception as e:
