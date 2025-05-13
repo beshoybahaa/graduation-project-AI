@@ -81,7 +81,7 @@ class graphRAG:
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         # Read documents from the temp directory
-        documents = SimpleDirectoryReader(path).load_data()
+        documents = SimpleDirectoryReader(file).load_data()
         return documents
 
     # async def index_doc(self, doc, path):
