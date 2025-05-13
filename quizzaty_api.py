@@ -3,7 +3,7 @@ import nest_asyncio
 nest_asyncio.apply()
 
 from typing import Union
-from fastapi import FastAPI, UploadFile, Form, File, BackgroundTasks
+from fastapi import FastAPI, UploadFile, Form, File
 from pyngrok import ngrok
 import uvicorn
 from pydantic import BaseModel
@@ -246,10 +246,7 @@ import asyncio
 from functools import partial
 
 # create the app
-app = FastAPI(
-    title="Quizaty API",
-    timeout=300  # 5 minutes timeout
-)
+app = FastAPI()
 
 # create the graphRAG object
 graphrag = graphRAG()
@@ -262,36 +259,32 @@ def index():
 
 # post request that takes a review (text type) and returns a sentiment score
 @app.post('/questions')
-async def predict(file: Annotated[UploadFile, File()], background_tasks: BackgroundTasks):
+async def predict(file: Annotated[UploadFile, File()]):
     try:
         path = "./"
         print(f"Received file: {file.filename}")
         print(f"Received path: {path}")
         
-        # Add progress tracking
-        progress = {
-            "status": "processing",
-            "step": "initializing",
-            "progress": 0
-        }
-        
-        # Update progress as you go through steps
-        progress["step"] = "loading_model"
-        graphrag.load_model()
-        progress["progress"] = 20
-        
-        progress["step"] = "loading_document"
-        document = graphrag.load_doc(file, path)
-        progress["progress"] = 40
-        
-        # Add proper error handling for file size
-        if file.size > 10 * 1024 * 1024:  # 10MB limit
-            return JSONResponse(
-                status_code=400,
-                content={"error": "File too large", "details": "Maximum file size is 10MB"}
-            )
-            
         try:
+            graphrag.load_model()
+            print("load_model : done")
+        except Exception as e:
+            return JSONResponse(
+                status_code=500,
+                content={"error": "Model Loading Error", "step": "load_model", "details": str(e)}
+            )
+
+        try:
+            document = graphrag.load_doc(file, path)
+            print("load_doc : done")
+        except Exception as e:
+            return JSONResponse(
+                status_code=500,
+                content={"error": "Document Loading Error", "step": "load_doc", "details": str(e)}
+            )
+
+        try:
+            # graphrag.index_doc(document, path)
             asyncio_run(graphrag.index_doc(document, path))
             print("index_doc : done")
         except Exception as e:
