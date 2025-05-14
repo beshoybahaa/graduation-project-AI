@@ -56,7 +56,7 @@ class graphRAG:
     llm_questions = None
     embedding_model = None
     index = None
-    llm_api = "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"
+    llm_api = "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"
     doc = None
     query_engine = None
     temp_dir = None
