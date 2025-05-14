@@ -1,17 +1,35 @@
+# Standard library imports
 import asyncio
-import nest_asyncio
-nest_asyncio.apply()
-
-from typing import Union
-from fastapi import FastAPI, UploadFile, Form, File
-from pyngrok import ngrok
-import uvicorn
-from pydantic import BaseModel
-from typing import Annotated
-import time
 import json
-from tenacity import retry, stop_after_attempt, wait_exponential
+import os
+import re
+import shutil
+import tempfile
+import time
+from datetime import datetime
+from typing import Union, Annotated
+from math import ceil
+from functools import partial
+
+# Third-party imports
+import nest_asyncio
+from fastapi import FastAPI, UploadFile, Form, File
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from pyngrok import ngrok
+from tenacity import retry, stop_after_attempt, wait_exponential
+import uvicorn
+
+# LlamaIndex imports
+from llama_index.core import VectorStoreIndex, PropertyGraphIndex, StorageContext, load_index_from_storage, SimpleDirectoryReader
+from llama_index.core.graph_stores import SimpleGraphStore
+from llama_index.core.async_utils import asyncio_run
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.llms.groq import Groq
+from dotenv import load_dotenv
+
+# Apply nest_asyncio
+nest_asyncio.apply()
 
 # response of the model
 class Prediction(BaseModel):
@@ -27,7 +45,6 @@ class ErrorResponse(BaseModel):
 class input_body(BaseModel):
     path: str
 
-
 # graphRAG class
 class graphRAG:
     # variables
@@ -40,42 +57,30 @@ class graphRAG:
     embedding_model = None
     index = None
     llm_api = "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"
-    # deepseek_r1_distill_llama_70b = "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"
-    # questions_beshoy_1 = "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"
-    # questions_beshoy_2 = "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"
-    # questions_kerolos_1 = "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"
-    # questions_kerolos_2 = "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"
     doc = None
     query_engine = None
     temp_dir = None
     
-    # def __init__(self):
+    def __init__(self):
         # Create temp directories that will be used throughout the lifecycle
-        # self.storage_dir = tempfile.mkdtemp()
-        # self.upload_dir = tempfile.mkdtemp()
+        self.storage_dir = tempfile.mkdtemp()
+        self.upload_dir = tempfile.mkdtemp()
         
-        
-    # def __del__(self):
-    #     # Clean up temporary directory when object is destroyed
-    #     if self.temp_dir and os.path.exists(self.temp_dir):
-    #         import shutil
-    #         shutil.rmtree(self.temp_dir)
+    def __del__(self):
+        # Clean up temporary directory when object is destroyed
+        if self.temp_dir and os.path.exists(self.temp_dir):
+            import shutil
+            shutil.rmtree(self.temp_dir)
 
     # load the model if not loaded
     def load_model(self):
-        # model_name_questions = "deepseek-r1-distill-llama-70b"
         model_name_questions = "deepseek-r1-distill-llama-70b"
-        self.llm_questions = Groq(model=model_name_questions, api_key=self.llm_api,max_retries=2)
+        self.llm_questions = Groq(model=model_name_questions, api_key=self.llm_api, max_retries=2)
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
-        # model_name_graph = "llama3-8b-8192"
-        # self.llm_graph_1 = Groq(model=model_name_graph, api_key=self.questions_beshoy_1)
-        # self.llm_graph_2 = Groq(model=model_name_graph, api_key=self.questions_kerolos_1)
-        # self.llm_graph_3 = Groq(model=model_name_graph, api_key=self.questions_beshoy_2)
-        # self.llm_graph_4 = Groq(model=model_name_graph, api_key=self.questions_kerolos_2)
         return
 
     # load the uploaded document
-    def load_doc(self,file,path):
+    def load_doc(self, file, path):
         # Create a temporary directory for file processing
         temp_dir = tempfile.mkdtemp()
         file_path = os.path.join(temp_dir, file.filename)
@@ -93,62 +98,23 @@ class graphRAG:
             if os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
 
-    # async def index_doc(self, doc, path):
-    #     loop = asyncio.get_event_loop()
-
-    #     # Split the document into 5 chunks
-    #     chunk_size = ceil(len(doc) / 8)
-    #     doc_chunks = [doc[i:i + chunk_size] for i in range(0, len(doc), chunk_size)]
-
-    #     def create_index_shared_store():
-    #         print("Initializing shared SimpleGraphStore...")
-    #         # Create a shared in-memory graph store
-    #         shared_graph_store = SimpleGraphStore()
-    #         shared_storage_context = StorageContext.from_defaults(graph_store=shared_graph_store)
-
-    #         for i, chunk in enumerate(doc_chunks):
-    #             print(f"Processing chunk {i}/8 — length: {len(chunk)}")
-    #             # Each chunk writes into the same graph store
-    #             PropertyGraphIndex.from_documents(
-    #                 chunk,
-    #                 llm=self.llm_questions,
-    #                 embed_model=self.embedding_model,
-    #                 storage_context=shared_storage_context,
-    #                 show_progress=True,
-    #             )
-    #             time.sleep(60)  # Optional: Sleep to avoid overwhelming the api (rate limiting)
-    #         # After all chunks processed, create one final index
-    #         final_index = PropertyGraphIndex(
-    #             storage_context=shared_storage_context,
-    #             llm=self.llm_graph,
-    #             embed_model=self.embedding_model,
-    #         )
-
-    #         return final_index
-
-    #     self.index = await loop.run_in_executor(None, create_index_shared_store)
-
-    #     self.index.storage_context.persist(persist_dir="./storage")
-    #     return self.index
-    
     async def index_doc(self, doc, path):
         print("Initializing shared SimpleGraphStore...")
         # Create a shared in-memory graph store
         shared_graph_store = SimpleGraphStore()
         shared_storage_context = StorageContext.from_defaults(graph_store=shared_graph_store)
         self.index = PropertyGraphIndex.from_documents(
-                doc,
-                llm=self.llm_questions,
-                embed_model=self.embedding_model,
-                storage_context=shared_storage_context,
-                show_progress=True,
-                use_async=True
-            )
-        # self.index.storage_context.persist(persist_dir=self.storage_dir)
+            doc,
+            llm=self.llm_questions,
+            embed_model=self.embedding_model,
+            storage_context=shared_storage_context,
+            show_progress=True,
+            use_async=True
+        )
         return self.index
 
     # load the index
-    def load_index(self,path):
+    def load_index(self, path):
         self.query_engine = self.index.as_query_engine(
             llm=self.llm_questions,
             embed_model=self.embedding_model,
@@ -157,8 +123,7 @@ class graphRAG:
         return
         
     # prediction
-    async def prediction(self,difficulty_level):  # dependency
-        # difficulty_level = "easy"
+    async def prediction(self, difficulty_level):
         response = self.query_engine.query(f"""You are an AI designed to generate multiple-choice questions (MCQs) based on a provided chapter of a book. Your task is to create a set of MCQs that focus on the main subject matter of the chapter. Ensure that each question is clear, concise, and relevant to the core themes of the chapter and be closed book style. Use the following structure for the MCQs:
             
             1. **Question Statement**: A clear and precise question related to the chapter content.
@@ -195,14 +160,9 @@ class graphRAG:
 
     # clear the index
     def clear_neo4j(self):
-        # Clean up both temporary directories
-        # if self.storage_dir and os.path.exists(self.storage_dir):
-        #     shutil.rmtree(self.storage_dir)
-        # if self.upload_dir and os.path.exists(self.upload_dir):
-        #     shutil.rmtree(self.upload_dir)
         self.index = None
     
-    def extract_json_from_response(self,response: str):
+    def extract_json_from_response(self, response: str):
         # Match individual JSON objects inside brackets
         object_matches = re.findall(r'{[^{}]*?(?:"[^"]*":\s*"[^"]*?",?)*[^{}]*?}', response, re.DOTALL)
     
@@ -215,7 +175,8 @@ class graphRAG:
                 continue  # Skip invalid or incomplete objects
     
         return valid_objects
-    def add_to_json(self ,json_data, difficulty_str, chapter_number):
+        
+    def add_to_json(self, json_data, difficulty_str, chapter_number):
         # Map string to integer values
         difficulty_map = {
             "easy": 1,
@@ -231,28 +192,6 @@ class graphRAG:
             item["chapterNo"] = chapter_number
     
         return json_data
-
-# import the libraries
-from llama_index.core import VectorStoreIndex
-from dotenv import load_dotenv
-from llama_index.core import SimpleDirectoryReader
-from llama_index.llms.groq import Groq
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.core.graph_stores import SimpleGraphStore
-from llama_index.core import PropertyGraphIndex
-from llama_index.core import StorageContext, load_index_from_storage
-from llama_index.core.async_utils import asyncio_run
-
-import os
-from datetime import datetime
-import tempfile
-import shutil
-import json
-import re
-from math import ceil
-
-import asyncio
-from functools import partial
 
 # create the app
 app = FastAPI()
@@ -353,5 +292,3 @@ async def predict(file: Annotated[UploadFile, File()]):
             status_code=500,
             content={"error": "Unexpected Error", "step": "general", "details": str(e)}
         )
-
-
