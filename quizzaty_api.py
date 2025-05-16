@@ -26,6 +26,7 @@ from llama_index.core.graph_stores import SimpleGraphStore
 from llama_index.core.async_utils import asyncio_run
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.groq import Groq
+from llama_index.graph_stores.falkordb import FalkorDBGraphStore
 from dotenv import load_dotenv
 
 # Apply nest_asyncio
@@ -60,11 +61,15 @@ class graphRAG:
     doc = None
     query_engine = None
     temp_dir = None
+    graph_store = None
     
     def __init__(self):
         # Create temp directories that will be used throughout the lifecycle
         self.storage_dir = tempfile.mkdtemp()
         self.upload_dir = tempfile.mkdtemp()
+        self.graph_store = FalkorDBGraphStore(
+            "redis://localhost:6379", decode_responses=True
+        )
         
     def __del__(self):
         # Clean up temporary directory when object is destroyed
@@ -101,13 +106,13 @@ class graphRAG:
     async def index_doc(self, doc, path):
         print("Initializing shared SimpleGraphStore...")
         # Create a shared in-memory graph store
-        shared_graph_store = SimpleGraphStore()
-        shared_storage_context = StorageContext.from_defaults(graph_store=shared_graph_store)
+        # shared_graph_store = SimpleGraphStore()
+        shared_storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
         self.index = PropertyGraphIndex.from_documents(
             doc,
             llm=self.llm_questions,
             embed_model=self.embedding_model,
-            storage_context=shared_storage_context,
+            storage_context=self.graph_store,
             show_progress=True,
             use_async=True
         )
