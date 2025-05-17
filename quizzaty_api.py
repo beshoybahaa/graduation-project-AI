@@ -69,6 +69,7 @@ class graphRAG:
         self.upload_dir = tempfile.mkdtemp()
         self.graph_store = FalkorDBGraphStore(
             "redis://localhost:6379", decode_responses=True
+            #test
         )
         
     def __del__(self):
