@@ -71,7 +71,7 @@ class graphRAG:
         self.graph_store = FalkorDBGraphStore(
                             "redis://localhost:6379", decode_responses=True
                             )
-        
+        #test
     def __del__(self):
         # Clean up temporary directory when object is destroyed
         if self.temp_dir and os.path.exists(self.temp_dir):
