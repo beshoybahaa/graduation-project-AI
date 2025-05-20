@@ -30,8 +30,6 @@ from llama_index.graph_stores.falkordb import FalkorDBGraphStore
 # from llama_index.graph_stores.falkordb import FalkorDBPropertyGraphStore
 # from dotenv import load_dotenv
 
-from prometheus_fastapi_instrumentator import Instrumentator
-
 # Apply nest_asyncio
 nest_asyncio.apply()
 
@@ -213,7 +211,6 @@ class graphRAG:
 
 # create the app
 app = FastAPI()
-Instrumentator().instrument(app).expose(app)
 
 # create the graphRAG object
 graphrag = graphRAG()
