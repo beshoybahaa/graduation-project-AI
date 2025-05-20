@@ -69,9 +69,18 @@ class graphRAG:
         # Create temp directories that will be used throughout the lifecycle
         self.storage_dir = tempfile.mkdtemp()
         self.upload_dir = tempfile.mkdtemp()
-        self.graph_store = FalkorDBGraphStore(
-                            "redis://0.0.0.0:3000", decode_responses=True
-                            )
+        
+        try:
+            # Connect to FalkorDB Docker container
+            self.graph_store = FalkorDBGraphStore(
+                "redis://localhost:3000",  # Docker container port
+                decode_responses=True
+            )
+        except Exception as e:
+            print(f"Warning: Could not connect to FalkorDB: {str(e)}")
+            print("Falling back to in-memory graph store")
+            # Fallback to in-memory graph store if FalkorDB is not available
+            self.graph_store = SimpleGraphStore()
 
     def __del__(self):
         # Clean up temporary directories when object is destroyed
