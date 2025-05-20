@@ -73,7 +73,7 @@ class graphRAG:
         try:
             # Connect to FalkorDB Docker container
             self.graph_store = FalkorDBGraphStore(
-                "redis://localhost:3000",  # Docker container port
+                "redis://0.0.0.0:3000",  # Docker container port
                 decode_responses=True
             )
         except Exception as e:
