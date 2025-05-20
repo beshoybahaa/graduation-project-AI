@@ -10,7 +10,6 @@ from datetime import datetime
 from typing import Union, Annotated
 from math import ceil
 from functools import partial
-import gc  # Add garbage collection
 
 # Third-party imports
 import nest_asyncio
@@ -33,9 +32,6 @@ from dotenv import load_dotenv
 
 # Apply nest_asyncio
 nest_asyncio.apply()
-
-# Load environment variables
-load_dotenv()
 
 # response of the model
 class Prediction(BaseModel):
@@ -72,49 +68,22 @@ class graphRAG:
         # Create temp directories that will be used throughout the lifecycle
         self.storage_dir = tempfile.mkdtemp()
         self.upload_dir = tempfile.mkdtemp()
-        self.graph_store = None
-        self.llm_questions = None
-        self.embedding_model = None
-        self.index = None
-        self.query_engine = None
-        self.temp_dir = None
-        
+        self.graph_store = FalkorDBGraphStore(
+                            "redis://0.0.0.0:3000", decode_responses=True
+                            )
+        #test
     def __del__(self):
-        # Clean up temporary directories when object is destroyed
-        for dir_path in [self.storage_dir, self.upload_dir, self.temp_dir]:
-            if dir_path and os.path.exists(dir_path):
-                try:
-                    shutil.rmtree(dir_path)
-                except Exception as e:
-                    print(f"Warning: Error cleaning up directory {dir_path}: {str(e)}")
-        
-        # Clear any remaining references
-        self.graph_store = None
-        self.llm_questions = None
-        self.embedding_model = None
-        self.index = None
-        self.query_engine = None
-        gc.collect()  # Force garbage collection
+        # Clean up temporary directory when object is destroyed
+        if self.temp_dir and os.path.exists(self.temp_dir):
+            import shutil
+            shutil.rmtree(self.temp_dir)
 
     # load the model if not loaded
     def load_model(self):
-        try:
-            model_name_questions = "deepseek-r1-distill-llama-70b"
-            self.llm_questions = Groq(model=model_name_questions, api_key=os.getenv("GROQ_API_KEY"), max_retries=2)
-            self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
-            
-            # Initialize graph store with error handling
-            try:
-                self.graph_store = FalkorDBGraphStore(
-                    "redis://0.0.0.0:3000", 
-                    decode_responses=True
-                )
-            except Exception as e:
-                print(f"Warning: Could not connect to Redis: {str(e)}")
-                self.graph_store = SimpleGraphStore()  # Fallback to in-memory store
-                
-        except Exception as e:
-            raise Exception(f"Error loading models: {str(e)}")
+        model_name_questions = "deepseek-r1-distill-llama-70b"
+        self.llm_questions = Groq(model=model_name_questions, api_key=self.llm_api, max_retries=2)
+        self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        return
 
     # load the uploaded document
     def load_doc(self, file, path):
@@ -250,7 +219,7 @@ async def predict(file: Annotated[UploadFile, File()]):
         print(f"Received file: {file.filename}")
         print(f"Received path: {path}")
         
-        # Initialize models with error handling
+        # Initialize models
         try:
             graphrag.load_model()
             print("load_model : done")
@@ -260,7 +229,7 @@ async def predict(file: Annotated[UploadFile, File()]):
                 content={"error": "Model Loading Error", "step": "load_model", "details": str(e)}
             )
 
-        # Load and process document with cleanup
+        # Load and process document
         try:
             document = graphrag.load_doc(file, path)
             print("load_doc : done")
@@ -270,13 +239,10 @@ async def predict(file: Annotated[UploadFile, File()]):
                 content={"error": "Document Loading Error", "step": "load_doc", "details": str(e)}
             )
 
-        # Index document with memory management
+        # Index document
         try:
             await graphrag.index_doc(document, path)
             print("index_doc : done")
-            # Clear document from memory
-            del document
-            gc.collect()
         except Exception as e:
             return JSONResponse(
                 status_code=500,
@@ -293,24 +259,20 @@ async def predict(file: Annotated[UploadFile, File()]):
                 content={"error": "Index Loading Error", "step": "load_index", "details": str(e)}
             )
 
-        # Generate questions for each difficulty level with memory management
+        # Generate questions for each difficulty level
         json_data_all = []
         for i in ["easy", "medium", "hard"]:
             try:
                 test = await graphrag.prediction(i)
+                print(type(test))
                 response_answer = str(test)
                 json_data = graphrag.extract_json_from_response(response_answer)
+                print("extract_json_from_response : done")
                 json_data = graphrag.add_to_json(json_data, i, 1)
+                print("add to json : done")
                 json_data_all.extend(json_data)
                 print(f"difficulty {i}: done")
-                
-                # Clear memory after each difficulty level
-                del test
-                del response_answer
-                del json_data
-                gc.collect()
-                
-                # Add a small delay between API calls
+                # Add a small delay between API calls to avoid rate limiting
                 await asyncio.sleep(3)
             except Exception as e:
                 return JSONResponse(
@@ -325,9 +287,9 @@ async def predict(file: Annotated[UploadFile, File()]):
         # Cleanup
         try:
             graphrag.clear_neo4j()
-            gc.collect()  # Final garbage collection
         except Exception as e:
             print(f"Warning: Error during cleanup: {str(e)}")
+            # Don't return error for cleanup issues, just log it
             
         return JSONResponse(content=json_data_all)
         
