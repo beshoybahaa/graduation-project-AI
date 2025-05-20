@@ -116,14 +116,14 @@ class graphRAG:
 
     async def index_doc(self, doc, path):
         print("Initializing shared SimpleGraphStore...")
-        # Create a shared in-memory graph store
-        # shared_graph_store = SimpleGraphStore()
-        shared_storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
+        # Create storage context with the graph store
+        storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
+        
         self.index = PropertyGraphIndex.from_documents(
             doc,
             llm=self.llm_questions,
             embed_model=self.embedding_model,
-            storage_context=self.graph_store,
+            storage_context=storage_context,  # Use the created storage context
             show_progress=True,
             use_async=True
         )
