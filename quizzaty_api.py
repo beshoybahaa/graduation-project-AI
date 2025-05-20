@@ -6,19 +6,19 @@ import re
 import shutil
 import tempfile
 import time
-from datetime import datetime
+# from datetime import datetime
 from typing import Union, Annotated
-from math import ceil
-from functools import partial
+# from math import ceil
+# from functools import partial
 
 # Third-party imports
 import nest_asyncio
 from fastapi import FastAPI, UploadFile, Form, File
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from pyngrok import ngrok
-from tenacity import retry, stop_after_attempt, wait_exponential
-import uvicorn
+# from pyngrok import ngrok
+# from tenacity import retry, stop_after_attempt, wait_exponential
+# import uvicorn
 
 # LlamaIndex imports
 from llama_index.core import VectorStoreIndex, PropertyGraphIndex, StorageContext, load_index_from_storage, SimpleDirectoryReader
@@ -28,7 +28,9 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.groq import Groq
 from llama_index.graph_stores.falkordb import FalkorDBGraphStore
 # from llama_index.graph_stores.falkordb import FalkorDBPropertyGraphStore
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
+
+from prometheus_fastapi_instrumentator import Instrumentator
 
 # Apply nest_asyncio
 nest_asyncio.apply()
@@ -211,6 +213,7 @@ class graphRAG:
 
 # create the app
 app = FastAPI()
+Instrumentator().instrument(app).expose(app)
 
 # create the graphRAG object
 graphrag = graphRAG()
