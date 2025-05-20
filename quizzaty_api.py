@@ -74,28 +74,15 @@ class graphRAG:
         #test
     def __del__(self):
         # Clean up temporary directory when object is destroyed
-        if hasattr(self, 'temp_dir') and self.temp_dir and os.path.exists(self.temp_dir):
+        if self.temp_dir and os.path.exists(self.temp_dir):
+            import shutil
             shutil.rmtree(self.temp_dir)
-        if hasattr(self, 'storage_dir') and self.storage_dir and os.path.exists(self.storage_dir):
-            shutil.rmtree(self.storage_dir)
-        if hasattr(self, 'upload_dir') and self.upload_dir and os.path.exists(self.upload_dir):
-            shutil.rmtree(self.upload_dir)
-        # Clear any remaining references
-        self.llm_questions = None
-        self.embedding_model = None
-        self.index = None
-        self.query_engine = None
-        self.graph_store = None
 
     # load the model if not loaded
     def load_model(self):
         model_name_questions = "deepseek-r1-distill-llama-70b"
         self.llm_questions = Groq(model=model_name_questions, api_key=self.llm_api, max_retries=2)
-        # Use a lighter embedding model
-        self.embedding_model = HuggingFaceEmbedding(
-            model_name="sentence-transformers/paraphrase-MiniLM-L3-v2",
-            device="cpu"  # Force CPU usage to reduce memory
-        )
+        self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
         return
 
     # load the uploaded document
@@ -256,8 +243,6 @@ async def predict(file: Annotated[UploadFile, File()]):
         try:
             await graphrag.index_doc(document, path)
             print("index_doc : done")
-            # Clear document from memory after indexing
-            del document
         except Exception as e:
             return JSONResponse(
                 status_code=500,
@@ -279,6 +264,7 @@ async def predict(file: Annotated[UploadFile, File()]):
         for i in ["easy", "medium", "hard"]:
             try:
                 test = await graphrag.prediction(i)
+                print(type(test))
                 response_answer = str(test)
                 json_data = graphrag.extract_json_from_response(response_answer)
                 print("extract_json_from_response : done")
@@ -286,10 +272,6 @@ async def predict(file: Annotated[UploadFile, File()]):
                 print("add to json : done")
                 json_data_all.extend(json_data)
                 print(f"difficulty {i}: done")
-                # Clear intermediate results
-                del test
-                del response_answer
-                del json_data
                 # Add a small delay between API calls to avoid rate limiting
                 await asyncio.sleep(3)
             except Exception as e:
@@ -305,11 +287,9 @@ async def predict(file: Annotated[UploadFile, File()]):
         # Cleanup
         try:
             graphrag.clear_neo4j()
-            # Force garbage collection
-            import gc
-            gc.collect()
         except Exception as e:
             print(f"Warning: Error during cleanup: {str(e)}")
+            # Don't return error for cleanup issues, just log it
             
         return JSONResponse(content=json_data_all)
         
