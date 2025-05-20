@@ -61,7 +61,8 @@ class graphRAG:
     llm_api = "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"
     doc = None
     query_engine = None
-    temp_dir = None
+    storage_dir = None
+    upload_dir = None
     graph_store = None
     
     def __init__(self):
@@ -71,12 +72,15 @@ class graphRAG:
         self.graph_store = FalkorDBGraphStore(
                             "redis://0.0.0.0:3000", decode_responses=True
                             )
-        #test
+
     def __del__(self):
-        # Clean up temporary directory when object is destroyed
-        if self.temp_dir and os.path.exists(self.temp_dir):
-            import shutil
-            shutil.rmtree(self.temp_dir)
+        # Clean up temporary directories when object is destroyed
+        for dir_path in [self.storage_dir, self.upload_dir]:
+            if dir_path and os.path.exists(dir_path):
+                try:
+                    shutil.rmtree(dir_path)
+                except Exception as e:
+                    print(f"Warning: Error cleaning up directory {dir_path}: {str(e)}")
 
     # load the model if not loaded
     def load_model(self):
@@ -87,22 +91,19 @@ class graphRAG:
 
     # load the uploaded document
     def load_doc(self, file, path):
-        # Create a temporary directory for file processing
-        temp_dir = tempfile.mkdtemp()
-        file_path = os.path.join(temp_dir, file.filename)
+        file_path = os.path.join(self.upload_dir, file.filename)
         
         try:
             # Save the uploaded file
             with open(file_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
             
-            # Read documents from the temp directory
-            documents = SimpleDirectoryReader(temp_dir).load_data()
+            # Read documents from the upload directory
+            documents = SimpleDirectoryReader(self.upload_dir).load_data()
             return documents
-        finally:
-            # Clean up the temporary directory
-            if os.path.exists(temp_dir):
-                shutil.rmtree(temp_dir)
+        except Exception as e:
+            print(f"Error loading document: {str(e)}")
+            raise
 
     async def index_doc(self, doc, path):
         print("Initializing shared SimpleGraphStore...")
