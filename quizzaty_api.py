@@ -100,9 +100,9 @@ class graphRAG:
             model_name_questions = "deepseek-r1-distill-llama-70b"
             # Initialize all LLM instances
             self.llm_graph_1 = Groq(model=model_name_questions, api_key=self.llm_api, max_retries=2)
-            self.llm_graph_2 = Groq(model=model_name_questions, api_key=self.llm_api_2, max_retries=2)
-            self.llm_graph_3 = Groq(model=model_name_questions, api_key=self.llm_api_3, max_retries=2)
-            self.llm_graph_4 = Groq(model=model_name_questions, api_key=self.llm_api_4, max_retries=2)
+            self.llm_graph_2 = Groq(model="meta-llama/llama-4-scout-17b-16e-instruct", api_key=self.llm_api_2, max_retries=2)
+            self.llm_graph_3 = Groq(model="gemma2-9b-it", api_key=self.llm_api_3, max_retries=2)
+            self.llm_graph_4 = Groq(model="llama-guard-3-8b", api_key=self.llm_api_4, max_retries=2)
             
             # Set the main LLM instance (for backward compatibility)
             self.llm_questions = self.llm_graph_1
