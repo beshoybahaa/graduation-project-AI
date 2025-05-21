@@ -152,7 +152,7 @@ class graphRAG:
             storage_context=storage_context,  # Use the created storage context
             show_progress=True,
             num_workers=1,
-            # chunk_size=1024,  # Process 1024 tokens per chunk
+            chunk_size=500,  # Process 1024 tokens per chunk
             chunk_overlap=100,  # 300 token overlap between chunks
             chunk_sleep_time=60.0  # Sleep 1 second between chunks
         )
