@@ -6,6 +6,7 @@ import re
 import shutil
 import tempfile
 import time
+import random
 # from datetime import datetime
 from typing import Union, Annotated
 # from math import ceil
@@ -150,11 +151,11 @@ class graphRAG:
             (self.llm_graph_4, "llama-guard-3-8b")
         ]
         
-        # Split document into chunks
+        # Split document into chunks with more conservative numbers
         doc_length = len(doc)
-        total_chunks = 955  # Total number of chunks to process
+        total_chunks = 100  # Reduced from 955 to 100
         chunks_per_llm = total_chunks // 4  # Divide chunks among 4 LLMs
-        overlap = 200  # Add some overlap between chunks
+        overlap = 100  # Reduced overlap
         chunks = []
         
         # Create chunks for each LLM
@@ -174,10 +175,11 @@ class graphRAG:
         for i, (_, model_name) in enumerate(llm_instances):
             print(f"LLM {i+1} ({model_name}) will process {len(chunks[i])} chunks")
         
-        # Process chunks in parallel using different LLM instances
+        # Process chunks sequentially with rate limit handling
         async def process_chunk(chunk, llm, model_name, chunk_id, llm_id, total_chunks):
-            max_retries = 3
+            max_retries = 5  # Increased retries
             retry_count = 0
+            base_delay = 60  # Base delay in seconds
             
             while retry_count < max_retries:
                 try:
@@ -187,7 +189,7 @@ class graphRAG:
                         llm=llm,
                         embed_model=self.embedding_model,
                         storage_context=storage_context,
-                        show_progress=False,  # Disable individual progress bars
+                        show_progress=False,
                         use_async=True
                     )
                     print(f"LLM {llm_id} ({model_name}) - Completed chunk {chunk_id + 1}/{total_chunks}")
@@ -197,54 +199,46 @@ class graphRAG:
                     if "RateLimitError" in error_str or "rate_limit_exceeded" in error_str:
                         retry_count += 1
                         if retry_count < max_retries:
-                            print(f"\nLLM {llm_id} ({model_name}) - Rate limit hit. Waiting 60 seconds before retry {retry_count}/{max_retries}")
-                            await asyncio.sleep(60)
+                            # Exponential backoff with jitter
+                            delay = base_delay * (2 ** retry_count) + random.uniform(0, 10)
+                            print(f"\nLLM {llm_id} ({model_name}) - Rate limit hit. Waiting {delay:.2f} seconds before retry {retry_count}/{max_retries}")
+                            await asyncio.sleep(delay)
                             continue
                     print(f"Error processing chunk {chunk_id} with LLM {llm_id} ({model_name}): {str(e)}")
                     raise
         
-        # Create tasks for parallel processing with timeouts
-        async def process_llm_chunks(llm_chunks, llm, model_name, llm_id):
-            chunk_indices = []
-            total_chunks = len(llm_chunks)
-            
-            for i, chunk in enumerate(llm_chunks):
+        # Process chunks sequentially for each LLM
+        chunk_indices = []
+        for i, ((llm, model_name), llm_chunks) in enumerate(zip(llm_instances, chunks)):
+            llm_indices = []
+            for j, chunk in enumerate(llm_chunks):
                 try:
                     # Process chunk
-                    chunk_index = await process_chunk(chunk, llm, model_name, i, llm_id, total_chunks)
-                    chunk_indices.append(chunk_index)
+                    chunk_index = await process_chunk(chunk, llm, model_name, j, i+1, len(llm_chunks))
+                    llm_indices.append(chunk_index)
                     
-                    # Add timeout after every 3 chunks
-                    if (i + 1) % 3 == 0:
-                        print(f"\nLLM {llm_id} ({model_name}) taking a 60-second break after chunk {i+1}/{total_chunks}")
-                        await asyncio.sleep(60)
+                    # Add delay between chunks
+                    await asyncio.sleep(5)  # 5 second delay between chunks
                     
                 except Exception as e:
-                    print(f"Error in LLM {llm_id} ({model_name}) processing chunk {i}: {str(e)}")
+                    print(f"Error in LLM {i+1} ({model_name}) processing chunk {j}: {str(e)}")
                     raise
             
-            return chunk_indices
-        
-        # Create tasks for each LLM
-        tasks = [
-            process_llm_chunks(chunks[i], llm, model_name, i+1)
-            for i, ((llm, model_name), _) in enumerate(zip(llm_instances, chunks))
-        ]
+            chunk_indices.extend(llm_indices)
+            
+            # Add longer delay between LLMs
+            if i < len(llm_instances) - 1:  # Don't delay after the last LLM
+                print(f"\nTaking a 30-second break before starting next LLM")
+                await asyncio.sleep(30)
         
         try:
-            # Process all LLM groups in parallel
-            all_chunk_indices = await asyncio.gather(*tasks)
-            
-            # Flatten the results
-            chunk_indices = [idx for llm_indices in all_chunk_indices for idx in llm_indices]
-            
-            # Merge the indices (FalkorDB will handle this automatically)
+            # Merge the indices
             self.index = chunk_indices[0]  # Use the first index as the base
             
             print(f"\nProcessing complete with {len(chunk_indices)} total chunks")
             return self.index
         except Exception as e:
-            print(f"Error during parallel processing: {str(e)}")
+            print(f"Error during processing: {str(e)}")
             # Fallback to single chunk processing if parallel processing fails
             print("Falling back to single chunk processing...")
             self.index = PropertyGraphIndex.from_documents(
