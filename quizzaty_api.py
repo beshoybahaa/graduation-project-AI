@@ -27,7 +27,6 @@ from llama_index.core.async_utils import asyncio_run
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.together import TogetherLLM
 from llama_index.graph_stores.falkordb import FalkorDBGraphStore
-from llama_index.core.text_splitter import RecursiveCharacterTextSplitter
 # from llama_index.graph_stores.falkordb import FalkorDBPropertyGraphStore
 # from dotenv import load_dotenv
 
@@ -59,7 +58,7 @@ class graphRAG:
     llm_questions = None
     embedding_model = None
     index = None
-    llm_api = "tgp_v1_mBgpHIOQ76SvIKx6I5OhOcREZFWkEiDJAU4FdZ4qAzE"  # Replace with your Together AI API key
+    llm_api = "tgp_v1_iq2ZxVfpZxSW-5UG36jcLXt0Um_OKEXzPmBjaQDWnrc"  # Replace with your Together AI API key
     doc = None
     query_engine = None
     storage_dir = None
@@ -94,7 +93,7 @@ class graphRAG:
 
     # load the model if not loaded
     def load_model(self):
-        model_name_questions = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
+        model_name_questions = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free"
         self.llm_questions = TogetherLLM(
             model=model_name_questions,
             api_key=self.llm_api,
@@ -124,31 +123,13 @@ class graphRAG:
         # Create storage context with the graph store
         storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
         
-        # Configure text splitter for smaller chunks
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=512,  # Smaller chunk size
-            chunk_overlap=100,  # Smaller overlap
-            length_function=len,
-            separators=["\n\n", "\n", " ", ""]
-        )
-        
-        # Add delay between chunks to avoid rate limits
-        async def process_with_delay(docs):
-            for i, d in enumerate(docs):
-                if i > 0:  # Skip delay for first chunk
-                    await asyncio.sleep(30)  # 2 second delay between chunks
-                yield d
-        
         self.index = PropertyGraphIndex.from_documents(
-            process_with_delay(doc),
+            doc,
             llm=self.llm_questions,
             embed_model=self.embedding_model,
-            storage_context=storage_context,
+            storage_context=storage_context,  # Use the created storage context
             show_progress=True,
-            use_async=True,
-            text_splitter=text_splitter,
-            max_tokens_per_chunk=512,
-            max_chunks_per_doc=1000
+            use_async=True
         )
         return self.index
 
