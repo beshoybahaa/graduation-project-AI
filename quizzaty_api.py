@@ -64,7 +64,7 @@ class graphRAG:
     llm_questions = None
     embedding_model = None
     index = None
-    llm_api = "tgp_v1_iq2ZxVfpZxSW-5UG36jcLXt0Um_OKEXzPmBjaQDWnrc"  # Replace with your Together AI API key
+    llm_api = "tgp_v1_mBgpHIOQ76SvIKx6I5OhOcREZFWkEiDJAU4FdZ4qAzE"  # Replace with your Together AI API key
     doc = None
     query_engine = None
     storage_dir = None
