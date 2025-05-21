@@ -59,6 +59,9 @@ class graphRAG:
     embedding_model = None
     index = None
     llm_api = "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"
+    llm_api_2 = "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"
+    llm_api_3 = "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"
+    llm_api_4 = "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"
     doc = None
     query_engine = None
     storage_dir = None
@@ -94,7 +97,15 @@ class graphRAG:
     # load the model if not loaded
     def load_model(self):
         model_name_questions = "deepseek-r1-distill-llama-70b"
-        self.llm_questions = Groq(model=model_name_questions, api_key=self.llm_api, max_retries=2)
+        # Initialize all LLM instances
+        self.llm_graph_1 = Groq(model=model_name_questions, api_key=self.llm_api, max_retries=2)
+        self.llm_graph_2 = Groq(model=model_name_questions, api_key=self.llm_api_2, max_retries=2)
+        self.llm_graph_3 = Groq(model=model_name_questions, api_key=self.llm_api_3, max_retries=2)
+        self.llm_graph_4 = Groq(model=model_name_questions, api_key=self.llm_api_4, max_retries=2)
+        
+        # Set the main LLM instance (for backward compatibility)
+        self.llm_questions = self.llm_graph_1
+        
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
         return
 
@@ -116,17 +127,52 @@ class graphRAG:
 
     async def index_doc(self, doc, path):
         print("Initializing shared SimpleGraphStore...")
-        # Create storage context with the graph store
         storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
         
-        self.index = PropertyGraphIndex.from_documents(
-            doc,
-            llm=self.llm_questions,
-            embed_model=self.embedding_model,
-            storage_context=storage_context,  # Use the created storage context
-            show_progress=True,
-            use_async=True
-        )
+        # Initialize all LLM instances
+        model_name = "deepseek-r1-distill-llama-70b"
+        llm_instances = [
+            Groq(model=model_name, api_key=self.llm_api, max_retries=2),
+            Groq(model=model_name, api_key=self.llm_api_2, max_retries=2),
+            Groq(model=model_name, api_key=self.llm_api_3, max_retries=2),
+            Groq(model=model_name, api_key=self.llm_api_4, max_retries=2)
+        ]
+        
+        # Split document into 4 roughly equal parts
+        doc_length = len(doc)
+        chunk_size = doc_length // 4
+        chunks = []
+        
+        for i in range(4):
+            start_idx = i * chunk_size
+            end_idx = start_idx + chunk_size if i < 3 else doc_length
+            chunks.append(doc[start_idx:end_idx])
+        
+        # Process chunks in parallel using different LLM instances
+        async def process_chunk(chunk, llm):
+            chunk_index = PropertyGraphIndex.from_documents(
+                chunk,
+                llm=llm,
+                embed_model=self.embedding_model,
+                storage_context=storage_context,
+                show_progress=True,
+                use_async=True
+            )
+            return chunk_index
+        
+        # Create tasks for parallel processing
+        tasks = [
+            process_chunk(chunk, llm) 
+            for chunk, llm in zip(chunks, llm_instances)
+        ]
+        
+        # Process all chunks in parallel
+        chunk_indices = await asyncio.gather(*tasks)
+        
+        # Merge the indices (FalkorDB will handle this automatically)
+        self.index = chunk_indices[0]  # Use the first index as the base
+        
+        print(f"Processing complete with {len(chunks)} chunks")
         return self.index
 
     # load the index
