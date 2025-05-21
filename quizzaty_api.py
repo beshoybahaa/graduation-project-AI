@@ -142,31 +142,42 @@ class graphRAG:
         
         storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
         
-        # Use the already initialized LLM instances
+        # Use the already initialized LLM instances with their model names
         llm_instances = [
-            self.llm_graph_1,
-            self.llm_graph_2,
-            self.llm_graph_3,
-            self.llm_graph_4
+            (self.llm_graph_1, "deepseek-r1-distill-llama-70b"),
+            (self.llm_graph_2, "meta-llama/llama-4-scout-17b-16e-instruct"),
+            (self.llm_graph_3, "gemma2-9b-it"),
+            (self.llm_graph_4, "llama-guard-3-8b")
         ]
         
-        # Split document into 4 roughly equal parts with overlap
+        # Split document into chunks
         doc_length = len(doc)
-        chunk_size = doc_length // 4
+        total_chunks = 950  # Total number of chunks to process
+        chunks_per_llm = total_chunks // 4  # Divide chunks among 4 LLMs
         overlap = 200  # Add some overlap between chunks
         chunks = []
         
+        # Create chunks for each LLM
         for i in range(4):
-            start_idx = max(0, i * chunk_size - overlap if i > 0 else 0)
-            end_idx = min(doc_length, (i + 1) * chunk_size + overlap if i < 3 else doc_length)
-            chunks.append(doc[start_idx:end_idx])
+            start_chunk = i * chunks_per_llm
+            end_chunk = start_chunk + chunks_per_llm if i < 3 else total_chunks
+            llm_chunks = []
+            
+            for j in range(start_chunk, end_chunk):
+                start_idx = max(0, j * (doc_length // total_chunks) - overlap if j > 0 else 0)
+                end_idx = min(doc_length, (j + 1) * (doc_length // total_chunks) + overlap if j < total_chunks - 1 else doc_length)
+                llm_chunks.append(doc[start_idx:end_idx])
+            
+            chunks.append(llm_chunks)
         
-        print(f"Split document into {len(chunks)} chunks")
+        print(f"Split document into {len(chunks)} LLM groups")
+        for i, (_, model_name) in enumerate(llm_instances):
+            print(f"LLM {i+1} ({model_name}) will process {len(chunks[i])} chunks")
         
         # Process chunks in parallel using different LLM instances
-        async def process_chunk(chunk, llm, chunk_id):
+        async def process_chunk(chunk, llm, model_name, chunk_id, llm_id):
             try:
-                print(f"Processing chunk {chunk_id} with LLM instance")
+                print(f"Processing chunk {chunk_id} with LLM {llm_id} ({model_name})")
                 chunk_index = PropertyGraphIndex.from_documents(
                     chunk,
                     llm=llm,
@@ -175,26 +186,49 @@ class graphRAG:
                     show_progress=True,
                     use_async=True
                 )
-                print(f"Chunk {chunk_id} processing complete")
+                print(f"Chunk {chunk_id} processing complete with LLM {llm_id} ({model_name})")
                 return chunk_index
             except Exception as e:
-                print(f"Error processing chunk {chunk_id}: {str(e)}")
+                print(f"Error processing chunk {chunk_id} with LLM {llm_id} ({model_name}): {str(e)}")
                 raise
         
-        # Create tasks for parallel processing
+        # Create tasks for parallel processing with timeouts
+        async def process_llm_chunks(llm_chunks, llm, model_name, llm_id):
+            chunk_indices = []
+            for i, chunk in enumerate(llm_chunks):
+                try:
+                    # Process chunk
+                    chunk_index = await process_chunk(chunk, llm, model_name, i, llm_id)
+                    chunk_indices.append(chunk_index)
+                    
+                    # Add timeout after every 3 chunks
+                    if (i + 1) % 3 == 0:
+                        print(f"LLM {llm_id} ({model_name}) taking a 60-second break after chunk {i+1}")
+                        await asyncio.sleep(60)
+                    
+                except Exception as e:
+                    print(f"Error in LLM {llm_id} ({model_name}) processing chunk {i}: {str(e)}")
+                    raise
+            
+            return chunk_indices
+        
+        # Create tasks for each LLM
         tasks = [
-            process_chunk(chunk, llm, i) 
-            for i, (chunk, llm) in enumerate(zip(chunks, llm_instances))
+            process_llm_chunks(chunks[i], llm, model_name, i+1)
+            for i, ((llm, model_name), _) in enumerate(zip(llm_instances, chunks))
         ]
         
         try:
-            # Process all chunks in parallel
-            chunk_indices = await asyncio.gather(*tasks)
+            # Process all LLM groups in parallel
+            all_chunk_indices = await asyncio.gather(*tasks)
+            
+            # Flatten the results
+            chunk_indices = [idx for llm_indices in all_chunk_indices for idx in llm_indices]
             
             # Merge the indices (FalkorDB will handle this automatically)
             self.index = chunk_indices[0]  # Use the first index as the base
             
-            print(f"Processing complete with {len(chunks)} chunks")
+            print(f"Processing complete with {len(chunk_indices)} total chunks")
             return self.index
         except Exception as e:
             print(f"Error during parallel processing: {str(e)}")
