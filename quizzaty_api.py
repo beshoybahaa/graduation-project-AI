@@ -65,7 +65,8 @@ class graphRAG:
     llm_questions = None
     embedding_model = None
     index = None
-    llm_api = "tgp_v1_mBgpHIOQ76SvIKx6I5OhOcREZFWkEiDJAU4FdZ4qAzE"  # Replace with your Together AI API key
+    # llm_api = "tgp_v1_mBgpHIOQ76SvIKx6I5OhOcREZFWkEiDJAU4FdZ4qAzE"  # Replace with your Together AI API key
+    llm_api = "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"
     doc = None
     query_engine = None
     storage_dir = None
@@ -100,11 +101,13 @@ class graphRAG:
 
     # load the model if not loaded
     def load_model(self):
-        model_name_questions = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free"
+        model_name = "meta-llama/llama-guard-4-12b"
         self.llm_questions = TogetherLLM(
-            model=model_name_questions,
+            model=model_name,
             api_key=self.llm_api,
-            max_retries=2
+            max_retries=2,
+            temperature=0.7,
+            max_tokens=2048
         )
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
