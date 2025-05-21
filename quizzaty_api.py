@@ -6,7 +6,6 @@ import re
 import shutil
 import tempfile
 import time
-import random
 # from datetime import datetime
 from typing import Union, Annotated
 # from math import ceil
@@ -60,9 +59,6 @@ class graphRAG:
     embedding_model = None
     index = None
     llm_api = "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"
-    llm_api_2 = "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"
-    llm_api_3 = "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"
-    llm_api_4 = "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"
     doc = None
     query_engine = None
     storage_dir = None
@@ -97,23 +93,10 @@ class graphRAG:
 
     # load the model if not loaded
     def load_model(self):
-        try:
-            model_name_questions = "deepseek-r1-distill-llama-70b"
-            # Initialize all LLM instances
-            self.llm_graph_1 = Groq(model=model_name_questions, api_key=self.llm_api, max_retries=2)
-            self.llm_graph_2 = Groq(model="meta-llama/llama-4-scout-17b-16e-instruct", api_key=self.llm_api_2, max_retries=2)
-            self.llm_graph_3 = Groq(model="gemma2-9b-it", api_key=self.llm_api_3, max_retries=2)
-            self.llm_graph_4 = Groq(model="llama-guard-3-8b", api_key=self.llm_api_4, max_retries=2)
-            
-            # Set the main LLM instance (for backward compatibility)
-            self.llm_questions = self.llm_graph_1
-            
-            self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
-            print("All LLM instances initialized successfully")
-            return
-        except Exception as e:
-            print(f"Error initializing models: {str(e)}")
-            raise
+        model_name_questions = "deepseek-r1-distill-llama-70b"
+        self.llm_questions = Groq(model=model_name_questions, api_key=self.llm_api, max_retries=2)
+        self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        return
 
     # load the uploaded document
     def load_doc(self, file, path):
@@ -133,123 +116,18 @@ class graphRAG:
 
     async def index_doc(self, doc, path):
         print("Initializing shared SimpleGraphStore...")
-        
-        # Clear existing graph store
-        try:
-            self.graph_store.clear()
-            print("Cleared existing graph store")
-        except Exception as e:
-            print(f"Warning: Could not clear graph store: {str(e)}")
-        
+        # Create storage context with the graph store
         storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
         
-        # Use the already initialized LLM instances with their model names
-        llm_instances = [
-            (self.llm_graph_1, "deepseek-r1-distill-llama-70b"),
-            (self.llm_graph_2, "meta-llama/llama-4-scout-17b-16e-instruct"),
-            (self.llm_graph_3, "gemma2-9b-it"),
-            (self.llm_graph_4, "llama-guard-3-8b")
-        ]
-        
-        # Split document into chunks with more conservative numbers
-        doc_length = len(doc)
-        total_chunks = 100  # Reduced from 955 to 100
-        chunks_per_llm = total_chunks // 4  # Divide chunks among 4 LLMs
-        overlap = 100  # Reduced overlap
-        chunks = []
-        
-        # Create chunks for each LLM
-        for i in range(4):
-            start_chunk = i * chunks_per_llm
-            end_chunk = start_chunk + chunks_per_llm if i < 3 else total_chunks
-            llm_chunks = []
-            
-            for j in range(start_chunk, end_chunk):
-                start_idx = max(0, j * (doc_length // total_chunks) - overlap if j > 0 else 0)
-                end_idx = min(doc_length, (j + 1) * (doc_length // total_chunks) + overlap if j < total_chunks - 1 else doc_length)
-                llm_chunks.append(doc[start_idx:end_idx])
-            
-            chunks.append(llm_chunks)
-        
-        print(f"Split document into {len(chunks)} LLM groups")
-        for i, (_, model_name) in enumerate(llm_instances):
-            print(f"LLM {i+1} ({model_name}) will process {len(chunks[i])} chunks")
-        
-        # Process chunks sequentially with rate limit handling
-        async def process_chunk(chunk, llm, model_name, chunk_id, llm_id, total_chunks):
-            max_retries = 5  # Increased retries
-            retry_count = 0
-            base_delay = 60  # Base delay in seconds
-            
-            while retry_count < max_retries:
-                try:
-                    print(f"\nLLM {llm_id} ({model_name}) - Processing chunk {chunk_id + 1}/{total_chunks}")
-                    chunk_index = PropertyGraphIndex.from_documents(
-                        chunk,
-                        llm=llm,
-                        embed_model=self.embedding_model,
-                        storage_context=storage_context,
-                        show_progress=False,
-                        use_async=True
-                    )
-                    print(f"LLM {llm_id} ({model_name}) - Completed chunk {chunk_id + 1}/{total_chunks}")
-                    return chunk_index
-                except Exception as e:
-                    error_str = str(e)
-                    if "RateLimitError" in error_str or "rate_limit_exceeded" in error_str:
-                        retry_count += 1
-                        if retry_count < max_retries:
-                            # Exponential backoff with jitter
-                            delay = base_delay * (2 ** retry_count) + random.uniform(0, 10)
-                            print(f"\nLLM {llm_id} ({model_name}) - Rate limit hit. Waiting {delay:.2f} seconds before retry {retry_count}/{max_retries}")
-                            await asyncio.sleep(delay)
-                            continue
-                    print(f"Error processing chunk {chunk_id} with LLM {llm_id} ({model_name}): {str(e)}")
-                    raise
-        
-        # Process chunks sequentially for each LLM
-        chunk_indices = []
-        for i, ((llm, model_name), llm_chunks) in enumerate(zip(llm_instances, chunks)):
-            llm_indices = []
-            for j, chunk in enumerate(llm_chunks):
-                try:
-                    # Process chunk
-                    chunk_index = await process_chunk(chunk, llm, model_name, j, i+1, len(llm_chunks))
-                    llm_indices.append(chunk_index)
-                    
-                    # Add delay between chunks
-                    await asyncio.sleep(5)  # 5 second delay between chunks
-                    
-                except Exception as e:
-                    print(f"Error in LLM {i+1} ({model_name}) processing chunk {j}: {str(e)}")
-                    raise
-            
-            chunk_indices.extend(llm_indices)
-            
-            # Add longer delay between LLMs
-            if i < len(llm_instances) - 1:  # Don't delay after the last LLM
-                print(f"\nTaking a 30-second break before starting next LLM")
-                await asyncio.sleep(30)
-        
-        try:
-            # Merge the indices
-            self.index = chunk_indices[0]  # Use the first index as the base
-            
-            print(f"\nProcessing complete with {len(chunk_indices)} total chunks")
-            return self.index
-        except Exception as e:
-            print(f"Error during processing: {str(e)}")
-            # Fallback to single chunk processing if parallel processing fails
-            print("Falling back to single chunk processing...")
-            self.index = PropertyGraphIndex.from_documents(
-                doc,
-                llm=self.llm_questions,
-                embed_model=self.embedding_model,
-                storage_context=storage_context,
-                show_progress=True,
-                use_async=True
-            )
-            return self.index
+        self.index = PropertyGraphIndex.from_documents(
+            doc,
+            llm=self.llm_questions,
+            embed_model=self.embedding_model,
+            storage_context=storage_context,  # Use the created storage context
+            show_progress=True,
+            use_async=True
+        )
+        return self.index
 
     # load the index
     def load_index(self, path):
