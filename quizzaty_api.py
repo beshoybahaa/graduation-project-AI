@@ -27,6 +27,12 @@ from llama_index.core.async_utils import asyncio_run
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.together import TogetherLLM
 from llama_index.graph_stores.falkordb import FalkorDBGraphStore
+
+from llama_index.core.indices.property_graph import (
+    ImplicitPathExtractor,
+    SimpleLLMPathExtractor,
+)
+
 # from llama_index.graph_stores.falkordb import FalkorDBPropertyGraphStore
 # from dotenv import load_dotenv
 
@@ -125,12 +131,32 @@ class graphRAG:
         
         self.index = PropertyGraphIndex.from_documents(
             doc,
-            llm=self.llm_questions,
+            # llm=self.llm_questions,
             embed_model=self.embedding_model,
             storage_context=storage_context,  # Use the created storage context
             show_progress=True,
-            use_async=True
+            kg_extractors=[
+                    ImplicitPathExtractor(),
+                    SimpleLLMPathExtractor(
+                        llm=self.llm_questions,
+                        num_workers=1,
+                    ),
+                ],
         )
+
+        index = PropertyGraphIndex.from_documents(
+                documents,
+                embed_model=OpenAIEmbedding(model_name="text-embedding-3-small"),
+                kg_extractors=[
+                    ImplicitPathExtractor(),
+                    SimpleLLMPathExtractor(
+                        llm=OpenAI(model="gpt-3.5-turbo", temperature=0.3),
+                        num_workers=4,
+                        max_paths_per_chunk=10,
+                    ),
+                ],
+                show_progress=True,
+            )
         return self.index
 
     # load the index
