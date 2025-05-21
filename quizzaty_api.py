@@ -139,24 +139,10 @@ class graphRAG:
                     ImplicitPathExtractor(),
                     SimpleLLMPathExtractor(
                         llm=self.llm_questions,
-                        num_workers=2,
+                        num_workers=6,
                     ),
                 ],
         )
-
-        index = PropertyGraphIndex.from_documents(
-                documents,
-                embed_model=OpenAIEmbedding(model_name="text-embedding-3-small"),
-                kg_extractors=[
-                    ImplicitPathExtractor(),
-                    SimpleLLMPathExtractor(
-                        llm=OpenAI(model="gpt-3.5-turbo", temperature=0.3),
-                        num_workers=4,
-                        max_paths_per_chunk=10,
-                    ),
-                ],
-                show_progress=True,
-            )
         return self.index
 
     # load the index
