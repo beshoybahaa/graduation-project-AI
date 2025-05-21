@@ -29,6 +29,7 @@ from llama_index.llms.together import TogetherLLM
 from llama_index.graph_stores.falkordb import FalkorDBGraphStore
 # from llama_index.graph_stores.falkordb import FalkorDBPropertyGraphStore
 # from dotenv import load_dotenv
+from llama_index.text_splitter import RecursiveCharacterTextSplitter
 
 # Apply nest_asyncio
 nest_asyncio.apply()
@@ -123,13 +124,31 @@ class graphRAG:
         # Create storage context with the graph store
         storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
         
+        # Configure text splitter for smaller chunks
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=512,  # Smaller chunk size
+            chunk_overlap=100,  # Smaller overlap
+            length_function=len,
+            separators=["\n\n", "\n", " ", ""]
+        )
+        
+        # Add delay between chunks to avoid rate limits
+        async def process_with_delay(docs):
+            for i, d in enumerate(docs):
+                if i > 0:  # Skip delay for first chunk
+                    await asyncio.sleep(30)  # 2 second delay between chunks
+                yield d
+        
         self.index = PropertyGraphIndex.from_documents(
-            doc,
+            process_with_delay(doc),
             llm=self.llm_questions,
             embed_model=self.embedding_model,
-            storage_context=storage_context,  # Use the created storage context
+            storage_context=storage_context,
             show_progress=True,
-            use_async=True
+            use_async=True,
+            text_splitter=text_splitter,
+            max_tokens_per_chunk=512,
+            max_chunks_per_doc=1000
         )
         return self.index
 
