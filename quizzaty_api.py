@@ -142,7 +142,7 @@ class graphRAG:
             llm=self.llm_questions,
             embed_model=self.embedding_model,
             storage_context=storage_context,  # Use the created storage context
-            show_progress=True
+            show_progress=True,
             num_workers = 4)
         
         return self.index
