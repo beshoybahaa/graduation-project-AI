@@ -93,7 +93,7 @@ class graphRAG:
 
     # load the model if not loaded
     def load_model(self):
-        model_name_questions = "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-free"
+        model_name_questions = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
         self.llm_questions = TogetherLLM(
             model=model_name_questions,
             api_key=self.llm_api,
