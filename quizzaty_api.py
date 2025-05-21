@@ -139,7 +139,7 @@ class graphRAG:
         # Settings.llm = self.llm_questions
         self.index = PropertyGraphIndex.from_documents(
             doc,
-            # llm=self.llm_questions,
+            llm=self.llm_questions,
             embed_model=self.embedding_model,
             storage_context=storage_context,  # Use the created storage context
             show_progress=True,
