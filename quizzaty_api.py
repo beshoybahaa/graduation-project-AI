@@ -32,6 +32,7 @@ from llama_index.core.indices.property_graph import (
     ImplicitPathExtractor,
     SimpleLLMPathExtractor,
 )
+from llama_index.core import Settings
 
 # from llama_index.graph_stores.falkordb import FalkorDBPropertyGraphStore
 # from dotenv import load_dotenv
@@ -106,6 +107,10 @@ class graphRAG:
             max_retries=2
         )
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
+        Settings.chunk_size = 1024
+        Settings.chunk_overlap = 300
+
         return
 
     # load the uploaded document
