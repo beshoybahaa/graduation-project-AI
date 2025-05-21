@@ -103,7 +103,7 @@ class graphRAG:
     def load_model(self):
         model_name = "meta-llama/llama-guard-4-12b"
         self.llm_questions = Groq(
-            model_name=model_name,
+            model=model_name,
             api_key=self.llm_api,
             max_retries=2
         )
