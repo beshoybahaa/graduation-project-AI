@@ -27,7 +27,7 @@ from llama_index.core.async_utils import asyncio_run
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.together import TogetherLLM
 from llama_index.graph_stores.falkordb import FalkorDBGraphStore
-from llama_index.core.node_parser import RecursiveCharacterTextSplitter
+from llama_index.core.text_splitter import RecursiveCharacterTextSplitter
 # from llama_index.graph_stores.falkordb import FalkorDBPropertyGraphStore
 # from dotenv import load_dotenv
 
