@@ -134,20 +134,17 @@ class graphRAG:
         # Create storage context with the graph store
         storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
         
+        # Set global settings
+        # Settings.num_workers = 4
+        # Settings.llm = self.llm_questions
         self.index = PropertyGraphIndex.from_documents(
             doc,
-            # llm=self.llm_questions,
+            llm=self.llm_questions,
             embed_model=self.embedding_model,
             storage_context=storage_context,  # Use the created storage context
-            show_progress=True,
-            kg_extractors=[
-                    ImplicitPathExtractor(),
-                    SimpleLLMPathExtractor(
-                        llm=self.llm_questions,
-                        num_workers=4,
-                    ),
-                ],
-        )
+            show_progress=True
+            num_workers = 4)
+        
         return self.index
 
     # load the index
