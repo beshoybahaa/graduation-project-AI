@@ -19,13 +19,14 @@ from pydantic import BaseModel
 # from pyngrok import ngrok
 # from tenacity import retry, stop_after_attempt, wait_exponential
 # import uvicorn
+import groq
 
 # LlamaIndex imports
 from llama_index.core import VectorStoreIndex, PropertyGraphIndex, StorageContext, load_index_from_storage, SimpleDirectoryReader
 from llama_index.core.graph_stores import SimpleGraphStore
 from llama_index.core.async_utils import asyncio_run
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.llms.together import TogetherLLM
+from llama_index.llms.groq import Groq
 from llama_index.graph_stores.falkordb import FalkorDBGraphStore
 
 from llama_index.core.indices.property_graph import (
@@ -101,13 +102,11 @@ class graphRAG:
 
     # load the model if not loaded
     def load_model(self):
-        model_name = "meta-llama/llama-guard-4-12b"
-        self.llm_questions = TogetherLLM(
-            model=model_name,
+        model_name = "llama2-70b-4096"
+        self.llm_questions = Groq(
+            model_name=model_name,
             api_key=self.llm_api,
-            max_retries=2,
-            temperature=0.7,
-            max_tokens=2048
+            max_retries=2
         )
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
