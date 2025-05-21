@@ -152,7 +152,7 @@ class graphRAG:
         
         # Split document into chunks
         doc_length = len(doc)
-        total_chunks = 950  # Total number of chunks to process
+        total_chunks = 955  # Total number of chunks to process
         chunks_per_llm = total_chunks // 4  # Divide chunks among 4 LLMs
         overlap = 200  # Add some overlap between chunks
         chunks = []
@@ -175,18 +175,18 @@ class graphRAG:
             print(f"LLM {i+1} ({model_name}) will process {len(chunks[i])} chunks")
         
         # Process chunks in parallel using different LLM instances
-        async def process_chunk(chunk, llm, model_name, chunk_id, llm_id):
+        async def process_chunk(chunk, llm, model_name, chunk_id, llm_id, total_chunks):
             try:
-                print(f"Processing chunk {chunk_id} with LLM {llm_id} ({model_name})")
+                print(f"\nLLM {llm_id} ({model_name}) - Processing chunk {chunk_id + 1}/{total_chunks}")
                 chunk_index = PropertyGraphIndex.from_documents(
                     chunk,
                     llm=llm,
                     embed_model=self.embedding_model,
                     storage_context=storage_context,
-                    show_progress=True,
+                    show_progress=False,  # Disable individual progress bars
                     use_async=True
                 )
-                print(f"Chunk {chunk_id} processing complete with LLM {llm_id} ({model_name})")
+                print(f"LLM {llm_id} ({model_name}) - Completed chunk {chunk_id + 1}/{total_chunks}")
                 return chunk_index
             except Exception as e:
                 print(f"Error processing chunk {chunk_id} with LLM {llm_id} ({model_name}): {str(e)}")
@@ -195,15 +195,17 @@ class graphRAG:
         # Create tasks for parallel processing with timeouts
         async def process_llm_chunks(llm_chunks, llm, model_name, llm_id):
             chunk_indices = []
+            total_chunks = len(llm_chunks)
+            
             for i, chunk in enumerate(llm_chunks):
                 try:
                     # Process chunk
-                    chunk_index = await process_chunk(chunk, llm, model_name, i, llm_id)
+                    chunk_index = await process_chunk(chunk, llm, model_name, i, llm_id, total_chunks)
                     chunk_indices.append(chunk_index)
                     
                     # Add timeout after every 3 chunks
                     if (i + 1) % 3 == 0:
-                        print(f"LLM {llm_id} ({model_name}) taking a 60-second break after chunk {i+1}")
+                        print(f"\nLLM {llm_id} ({model_name}) taking a 60-second break after chunk {i+1}/{total_chunks}")
                         await asyncio.sleep(60)
                     
                 except Exception as e:
@@ -228,7 +230,7 @@ class graphRAG:
             # Merge the indices (FalkorDB will handle this automatically)
             self.index = chunk_indices[0]  # Use the first index as the base
             
-            print(f"Processing complete with {len(chunk_indices)} total chunks")
+            print(f"\nProcessing complete with {len(chunk_indices)} total chunks")
             return self.index
         except Exception as e:
             print(f"Error during parallel processing: {str(e)}")
