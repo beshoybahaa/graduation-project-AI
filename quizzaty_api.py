@@ -176,21 +176,32 @@ class graphRAG:
         
         # Process chunks in parallel using different LLM instances
         async def process_chunk(chunk, llm, model_name, chunk_id, llm_id, total_chunks):
-            try:
-                print(f"\nLLM {llm_id} ({model_name}) - Processing chunk {chunk_id + 1}/{total_chunks}")
-                chunk_index = PropertyGraphIndex.from_documents(
-                    chunk,
-                    llm=llm,
-                    embed_model=self.embedding_model,
-                    storage_context=storage_context,
-                    show_progress=False,  # Disable individual progress bars
-                    use_async=True
-                )
-                print(f"LLM {llm_id} ({model_name}) - Completed chunk {chunk_id + 1}/{total_chunks}")
-                return chunk_index
-            except Exception as e:
-                print(f"Error processing chunk {chunk_id} with LLM {llm_id} ({model_name}): {str(e)}")
-                raise
+            max_retries = 3
+            retry_count = 0
+            
+            while retry_count < max_retries:
+                try:
+                    print(f"\nLLM {llm_id} ({model_name}) - Processing chunk {chunk_id + 1}/{total_chunks}")
+                    chunk_index = PropertyGraphIndex.from_documents(
+                        chunk,
+                        llm=llm,
+                        embed_model=self.embedding_model,
+                        storage_context=storage_context,
+                        show_progress=False,  # Disable individual progress bars
+                        use_async=True
+                    )
+                    print(f"LLM {llm_id} ({model_name}) - Completed chunk {chunk_id + 1}/{total_chunks}")
+                    return chunk_index
+                except Exception as e:
+                    error_str = str(e)
+                    if "RateLimitError" in error_str or "rate_limit_exceeded" in error_str:
+                        retry_count += 1
+                        if retry_count < max_retries:
+                            print(f"\nLLM {llm_id} ({model_name}) - Rate limit hit. Waiting 60 seconds before retry {retry_count}/{max_retries}")
+                            await asyncio.sleep(60)
+                            continue
+                    print(f"Error processing chunk {chunk_id} with LLM {llm_id} ({model_name}): {str(e)}")
+                    raise
         
         # Create tasks for parallel processing with timeouts
         async def process_llm_chunks(llm_chunks, llm, model_name, llm_id):
