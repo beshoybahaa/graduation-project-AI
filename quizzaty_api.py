@@ -19,7 +19,6 @@ from pydantic import BaseModel
 # from pyngrok import ngrok
 # from tenacity import retry, stop_after_attempt, wait_exponential
 # import uvicorn
-import groq
 
 # LlamaIndex imports
 from llama_index.core import VectorStoreIndex, PropertyGraphIndex, StorageContext, load_index_from_storage, SimpleDirectoryReader
