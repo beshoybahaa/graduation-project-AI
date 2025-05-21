@@ -17,7 +17,7 @@ from fastapi import FastAPI, UploadFile, Form, File
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 # from pyngrok import ngrok
-# from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 # import uvicorn
 
 # LlamaIndex imports
@@ -119,14 +119,35 @@ class graphRAG:
         # Create storage context with the graph store
         storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
         
-        self.index = PropertyGraphIndex.from_documents(
-            doc,
-            llm=self.llm_questions,
-            embed_model=self.embedding_model,
-            storage_context=storage_context,  # Use the created storage context
-            show_progress=True,
-            use_async=True
+        @retry(
+            stop=stop_after_attempt(5),
+            wait=wait_exponential(multiplier=1, min=4, max=60),
+            retry=retry_if_exception_type(Exception)
         )
+        async def create_index_with_retry():
+            try:
+                return await PropertyGraphIndex.from_documents(
+                    doc,
+                    llm=self.llm_questions,
+                    embed_model=self.embedding_model,
+                    storage_context=storage_context,
+                    show_progress=True,
+                    use_async=True
+                )
+            except Exception as e:
+                error_str = str(e)
+                if "Rate limit reached" in error_str:
+                    # Extract wait time from error message
+                    wait_time_match = re.search(r'try again in (\d+)m(\d+\.\d+)s', error_str)
+                    if wait_time_match:
+                        minutes = int(wait_time_match.group(1))
+                        seconds = float(wait_time_match.group(2))
+                        total_wait = minutes * 60 + seconds
+                        print(f"Rate limit reached. Waiting for {total_wait} seconds...")
+                        await asyncio.sleep(total_wait)
+                raise  # Re-raise the exception for retry mechanism
+        
+        self.index = await create_index_with_retry()
         return self.index
 
     # load the index
