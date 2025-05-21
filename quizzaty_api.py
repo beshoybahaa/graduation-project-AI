@@ -119,6 +119,9 @@ class graphRAG:
         # Create storage context with the graph store
         storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
         
+        # Store the initial documents
+        self.doc = doc
+        
         @retry(
             stop=stop_after_attempt(5),
             wait=wait_exponential(multiplier=1, min=4, max=60),
@@ -126,14 +129,39 @@ class graphRAG:
         )
         async def create_index_with_retry():
             try:
-                return await PropertyGraphIndex.from_documents(
-                    doc,
-                    llm=self.llm_questions,
-                    embed_model=self.embedding_model,
-                    storage_context=storage_context,
-                    show_progress=True,
-                    use_async=True
-                )
+                # If we already have an index, use it as a starting point
+                if hasattr(self, 'index') and self.index is not None:
+                    print("Resuming from previous progress...")
+                    # Get the remaining documents that haven't been processed
+                    processed_nodes = set(self.index.graph.get_nodes())
+                    remaining_docs = [d for d in self.doc if d.node_id not in processed_nodes]
+                    
+                    if not remaining_docs:
+                        print("All documents have been processed!")
+                        return self.index
+                        
+                    print(f"Processing remaining {len(remaining_docs)} documents...")
+                    # Continue processing with remaining documents
+                    return await PropertyGraphIndex.from_documents(
+                        remaining_docs,
+                        llm=self.llm_questions,
+                        embed_model=self.embedding_model,
+                        storage_context=storage_context,
+                        show_progress=True,
+                        use_async=True,
+                        existing_index=self.index  # Pass the existing index to continue from
+                    )
+                else:
+                    # First time processing
+                    print("Starting initial document processing...")
+                    return await PropertyGraphIndex.from_documents(
+                        self.doc,
+                        llm=self.llm_questions,
+                        embed_model=self.embedding_model,
+                        storage_context=storage_context,
+                        show_progress=True,
+                        use_async=True
+                    )
             except Exception as e:
                 error_str = str(e)
                 if "Rate limit reached" in error_str:
