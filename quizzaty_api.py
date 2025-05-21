@@ -139,7 +139,7 @@ class graphRAG:
                     ImplicitPathExtractor(),
                     SimpleLLMPathExtractor(
                         llm=self.llm_questions,
-                        num_workers=1,
+                        num_workers=2,
                     ),
                 ],
         )
