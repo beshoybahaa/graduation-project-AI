@@ -17,7 +17,7 @@ from fastapi import FastAPI, UploadFile, Form, File
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 # from pyngrok import ngrok
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+# from tenacity import retry, stop_after_attempt, wait_exponential
 # import uvicorn
 
 # LlamaIndex imports
@@ -25,7 +25,7 @@ from llama_index.core import VectorStoreIndex, PropertyGraphIndex, StorageContex
 from llama_index.core.graph_stores import SimpleGraphStore
 from llama_index.core.async_utils import asyncio_run
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.llms.groq import Groq
+from llama_index.llms.together import TogetherLLM
 from llama_index.graph_stores.falkordb import FalkorDBGraphStore
 # from llama_index.graph_stores.falkordb import FalkorDBPropertyGraphStore
 # from dotenv import load_dotenv
@@ -58,7 +58,7 @@ class graphRAG:
     llm_questions = None
     embedding_model = None
     index = None
-    llm_api = "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"
+    llm_api = "tgp_v1_iq2ZxVfpZxSW-5UG36jcLXt0Um_OKEXzPmBjaQDWnrc"  # Replace with your Together AI API key
     doc = None
     query_engine = None
     storage_dir = None
@@ -93,8 +93,12 @@ class graphRAG:
 
     # load the model if not loaded
     def load_model(self):
-        model_name_questions = "deepseek-r1-distill-llama-70b"
-        self.llm_questions = Groq(model=model_name_questions, api_key=self.llm_api, max_retries=2)
+        model_name_questions = "deepseek-ai/deepseek-r1-distill-llama-70b"
+        self.llm_questions = TogetherLLM(
+            model=model_name_questions,
+            api_key=self.llm_api,
+            max_retries=2
+        )
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
         return
 
@@ -119,63 +123,14 @@ class graphRAG:
         # Create storage context with the graph store
         storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
         
-        # Store the initial documents
-        self.doc = doc
-        
-        @retry(
-            stop=stop_after_attempt(5),
-            wait=wait_exponential(multiplier=1, min=4, max=60),
-            retry=retry_if_exception_type(Exception)
+        self.index = PropertyGraphIndex.from_documents(
+            doc,
+            llm=self.llm_questions,
+            embed_model=self.embedding_model,
+            storage_context=storage_context,  # Use the created storage context
+            show_progress=True,
+            use_async=True
         )
-        async def create_index_with_retry():
-            try:
-                # If we already have an index, use it as a starting point
-                if hasattr(self, 'index') and self.index is not None:
-                    print("Resuming from previous progress...")
-                    # Get the remaining documents that haven't been processed
-                    processed_nodes = set(self.index.graph.get_nodes())
-                    remaining_docs = [d for d in self.doc if d.node_id not in processed_nodes]
-                    
-                    if not remaining_docs:
-                        print("All documents have been processed!")
-                        return self.index
-                        
-                    print(f"Processing remaining {len(remaining_docs)} documents...")
-                    # Continue processing with remaining documents
-                    return await PropertyGraphIndex.from_documents(
-                        remaining_docs,
-                        llm=self.llm_questions,
-                        embed_model=self.embedding_model,
-                        storage_context=storage_context,
-                        show_progress=True,
-                        use_async=True,
-                        existing_index=self.index  # Pass the existing index to continue from
-                    )
-                else:
-                    # First time processing
-                    print("Starting initial document processing...")
-                    return await PropertyGraphIndex.from_documents(
-                        self.doc,
-                        llm=self.llm_questions,
-                        embed_model=self.embedding_model,
-                        storage_context=storage_context,
-                        show_progress=True,
-                        use_async=True
-                    )
-            except Exception as e:
-                error_str = str(e)
-                if "Rate limit reached" in error_str:
-                    # Extract wait time from error message
-                    wait_time_match = re.search(r'try again in (\d+)m(\d+\.\d+)s', error_str)
-                    if wait_time_match:
-                        minutes = int(wait_time_match.group(1))
-                        seconds = float(wait_time_match.group(2))
-                        total_wait = minutes * 60 + seconds
-                        print(f"Rate limit reached. Waiting for {total_wait} seconds...")
-                        await asyncio.sleep(total_wait)
-                raise  # Re-raise the exception for retry mechanism
-        
-        self.index = await create_index_with_retry()
         return self.index
 
     # load the index
