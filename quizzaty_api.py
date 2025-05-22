@@ -174,10 +174,11 @@ class graphRAG:
                 llm=self.llm_questions,
                 embed_model=self.embedding_model,
                 storage_context=storage_context,
-                show_progress=True
+                # show_progress=True
             )
             # Sleep for 30 seconds after every 4 chunks
             if (i + 1) % 4 == 0:
+                print(f"{i+1} / {len(doc)}")
                 time.sleep(30)
         
         return self.index
