@@ -139,17 +139,27 @@ class graphRAG:
         # Set global settings
         # Settings.num_workers = 4
         # Settings.llm = self.llm_questions
-        self.index = PropertyGraphIndex.from_documents(
-            doc,
-            llm=self.llm_questions,
-            embed_model=self.embedding_model,
-            storage_context=storage_context,  # Use the created storage context
-            show_progress=True,
-            num_workers=2,
-            chunk_size=1024,  # Process 1024 tokens per chunk
-            chunk_overlap=100,  # 300 token overlap between chunks
-            chunk_sleep_time=90.0  # Sleep 1 second between chunks
-        )
+        # self.index = PropertyGraphIndex.from_documents(
+        #     doc,
+        #     llm=self.llm_questions,
+        #     embed_model=self.embedding_model,
+        #     storage_context=storage_context,  # Use the created storage context
+        #     show_progress=True,
+        #     num_workers=2,
+        #     chunk_size=1024,  # Process 1024 tokens per chunk
+        #     chunk_overlap=100,  # 300 token overlap between chunks
+        #     chunk_sleep_time=90.0  # Sleep 1 second between chunks
+        # )
+        
+        for single_doc in doc:
+            self.index = PropertyGraphIndex.from_documents(
+                [single_doc],
+                llm=self.llm_questions,
+                embed_model=self.embedding_model,
+                storage_context=storage_context,
+                show_progress=True
+            )
+            time.sleep(30)
         
         return self.index
 
