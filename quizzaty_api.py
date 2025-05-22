@@ -33,7 +33,6 @@ from llama_index.core.indices.property_graph import (
     SimpleLLMPathExtractor,
 )
 from llama_index.core import Settings
-from llama_index.llms.together import TogetherLLM
 
 # from llama_index.graph_stores.falkordb import FalkorDBPropertyGraphStore
 # from dotenv import load_dotenv
@@ -102,16 +101,10 @@ class graphRAG:
 
     # load the model if not loaded
     def load_model(self):
-        # model_name = "meta-llama/llama-4-scout-17b-16e-instruct"
-        # self.llm_questions = Groq(
-        #     model=model_name,
-        #     api_key=self.llm_api,
-        #     max_retries=2
-        # )
-        
-        self.llm_questions = TogetherLLM(
-            model="meta-llama/Llama-3.3-70B-Instruct-Turbo-Free",
-            api_key="tgp_v1_uCF7Wpwtwhe14CmbvWZ0R4DT7Lfp3Hnf3xcZXKmwqec",
+        model_name = "meta-llama/llama-4-scout-17b-16e-instruct"
+        self.llm_questions = Groq(
+            model=model_name,
+            api_key=self.llm_api,
             max_retries=2
         )
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
@@ -152,9 +145,9 @@ class graphRAG:
             storage_context=storage_context,  # Use the created storage context
             show_progress=True,
             num_workers=1,
-            chunk_size=500,  # Process 1024 tokens per chunk
+            # chunk_size=1024,  # Process 1024 tokens per chunk
             chunk_overlap=100,  # 300 token overlap between chunks
-            chunk_sleep_time=60.0  # Sleep 1 second between chunks
+            chunk_sleep_time=90.0  # Sleep 1 second between chunks
         )
         
         return self.index
