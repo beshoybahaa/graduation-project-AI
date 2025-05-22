@@ -168,7 +168,7 @@ class graphRAG:
         # Replace original documents with chunked version
         doc = chunked_docs
         print(f"doc : {len(doc)}")
-        for single_doc in doc:
+        for i, single_doc in enumerate(doc):
             self.index = PropertyGraphIndex.from_documents(
                 [single_doc],
                 llm=self.llm_questions,
@@ -176,7 +176,9 @@ class graphRAG:
                 storage_context=storage_context,
                 show_progress=True
             )
-            time.sleep(30)
+            # Sleep for 30 seconds after every 4 chunks
+            if (i + 1) % 4 == 0:
+                time.sleep(30)
         
         return self.index
 
