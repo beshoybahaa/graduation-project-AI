@@ -21,7 +21,7 @@ from pydantic import BaseModel
 # import uvicorn
 
 # LlamaIndex imports
-from llama_index.core import VectorStoreIndex, PropertyGraphIndex, StorageContext, load_index_from_storage, SimpleDirectoryReader
+from llama_index.core import VectorStoreIndex, PropertyGraphIndex, StorageContext, load_index_from_storage, SimpleDirectoryReader, Document
 from llama_index.core.graph_stores import SimpleGraphStore
 from llama_index.core.async_utils import asyncio_run
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
@@ -110,8 +110,8 @@ class graphRAG:
         )
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
-        Settings.chunk_size = 1024
-        Settings.chunk_overlap = 300
+        Settings.chunk_size = 500
+        Settings.chunk_overlap = 200
 
         return
 
@@ -150,6 +150,22 @@ class graphRAG:
         #     chunk_overlap=100,  # 300 token overlap between chunks
         #     chunk_sleep_time=90.0  # Sleep 1 second between chunks
         # )
+        # Initialize text splitter with specified chunk size and overlap
+        text_splitter = TokenTextSplitter(
+            chunk_size=Settings.chunk_size,
+            chunk_overlap=Settings.chunk_overlap
+        )
+        
+        # Process each document and split into chunks
+        chunked_docs = []
+        for document in doc:
+            chunks = text_splitter.split_text(document.text)
+            # Convert chunks back to Document objects
+            doc_chunks = [Document(text=chunk) for chunk in chunks]
+            chunked_docs.extend(doc_chunks)
+            
+        # Replace original documents with chunked version
+        doc = chunked_docs
         print(f"doc : {len(doc)}")
         for single_doc in doc:
             self.index = PropertyGraphIndex.from_documents(
