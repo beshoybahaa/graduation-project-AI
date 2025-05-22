@@ -27,6 +27,7 @@ from llama_index.core.async_utils import asyncio_run
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.groq import Groq
 from llama_index.graph_stores.falkordb import FalkorDBGraphStore
+from llama_index.core.node_parser import TokenTextSplitter
 
 from llama_index.core.indices.property_graph import (
     ImplicitPathExtractor,
