@@ -177,7 +177,7 @@ class graphRAG:
                 # show_progress=True
             )
             # Sleep for 30 seconds after every 4 chunks
-            if (i + 1) % 4 == 0:
+            if (i + 1) % 10 == 0:
                 print(f"{i+1} / {len(doc)}")
                 time.sleep(30)
         
