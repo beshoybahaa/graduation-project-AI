@@ -150,7 +150,7 @@ class graphRAG:
         #     chunk_overlap=100,  # 300 token overlap between chunks
         #     chunk_sleep_time=90.0  # Sleep 1 second between chunks
         # )
-        
+        print(f"doc : {len(doc)}")
         for single_doc in doc:
             self.index = PropertyGraphIndex.from_documents(
                 [single_doc],
