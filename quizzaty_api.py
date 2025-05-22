@@ -103,7 +103,7 @@ class graphRAG:
     # load the model if not loaded
     def load_model(self):
         # model_name = "meta-llama/llama-4-scout-17b-16e-instruct"
-        model_name = "allam-2-7b"
+        model_name = "qwen-qwq-32b"
         self.llm_questions = Groq(
             model=model_name,
             api_key=self.llm_api,
