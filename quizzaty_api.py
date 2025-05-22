@@ -19,13 +19,14 @@ from pydantic import BaseModel
 # from pyngrok import ngrok
 # from tenacity import retry, stop_after_attempt, wait_exponential
 # import uvicorn
+import google.generativeai as genai
 
 # LlamaIndex imports
 from llama_index.core import VectorStoreIndex, PropertyGraphIndex, StorageContext, load_index_from_storage, SimpleDirectoryReader, Document
 from llama_index.core.graph_stores import SimpleGraphStore
 from llama_index.core.async_utils import asyncio_run
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.llms.groq import Groq
+from llama_index.llms.gemini import Gemini
 from llama_index.graph_stores.falkordb import FalkorDBGraphStore
 from llama_index.core.node_parser import TokenTextSplitter
 
@@ -102,11 +103,12 @@ class graphRAG:
 
     # load the model if not loaded
     def load_model(self):
-        # model_name = "meta-llama/llama-4-scout-17b-16e-instruct"
-        model_name = "qwen-qwq-32b"
-        self.llm_questions = Groq(
+        # Configure Gemini
+        genai.configure(api_key="AIzaSyCnhkm10JspaX-SPOw8eCtDeYsu8l52fiA")
+        model_name = "Gemma 3"
+        
+        self.llm_questions = Gemini(
             model=model_name,
-            api_key=self.llm_api,
             max_retries=2
         )
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
