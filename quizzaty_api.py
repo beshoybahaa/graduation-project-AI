@@ -182,10 +182,10 @@ class graphRAG:
                 # show_progress=True
             )
             # Sleep for 30 seconds after every 30 chunks
-            if (i + 1) % 30 == 0:
+            if (i + 1) % 50 == 0:
                 chunk_end_time = time.time()
                 chunk_duration = chunk_end_time - chunk_start_time
-                print(f"Processed chunks {i-28} to {i+1} in {chunk_duration:.2f} seconds")
+                print(f"Processed chunks {i-48} to {i+1} in {chunk_duration:.2f} seconds")
                 time.sleep(30)
                 chunk_start_time = time.time()  # Reset timer for next batch
         
