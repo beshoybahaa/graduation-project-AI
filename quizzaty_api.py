@@ -168,6 +168,11 @@ class graphRAG:
         # Replace original documents with chunked version
         doc = chunked_docs
         print(f"doc : {len(doc)}")
+        
+        # Start timer
+        start_time = time.time()
+        chunk_start_time = start_time
+        
         for i, single_doc in enumerate(doc):
             self.index = PropertyGraphIndex.from_documents(
                 [single_doc],
@@ -176,10 +181,18 @@ class graphRAG:
                 storage_context=storage_context,
                 # show_progress=True
             )
-            # Sleep for 30 seconds after every 4 chunks
+            # Sleep for 30 seconds after every 30 chunks
             if (i + 1) % 30 == 0:
-                print(f"{i+1} / {len(doc)}")
+                chunk_end_time = time.time()
+                chunk_duration = chunk_end_time - chunk_start_time
+                print(f"Processed chunks {i-28} to {i+1} in {chunk_duration:.2f} seconds")
                 time.sleep(30)
+                chunk_start_time = time.time()  # Reset timer for next batch
+        
+        # End timer and calculate duration
+        end_time = time.time()
+        duration = end_time - start_time
+        print(f"Total processing time: {duration:.2f} seconds ({duration/60:.2f} minutes)")
         
         return self.index
 
