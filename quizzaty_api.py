@@ -109,7 +109,7 @@ class graphRAG:
         model_name = "gemma-3-27b-it"
         self.llm_questions = Gemini(
             model=model_name,
-            api_key="AIzaSyCnhkm10JspaX-SPOw8eCtDeYsu8l52fiA",
+            api_key="AIzaSyAwuVnbkTAMhR5-DxwYzwBN9-vilX_bnXY",
             max_retries=2
         )
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
