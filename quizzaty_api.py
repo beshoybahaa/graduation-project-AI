@@ -103,8 +103,9 @@ class graphRAG:
 
     # load the model if not loaded
     def load_model(self):
-        # Configure Gemini
-        genai.configure(api_key="AIzaSyCnhkm10JspaX-SPOw8eCtDeYsu8l52fiA")
+        # Configure Gemini with API key from environment variable or fallback to hardcoded key
+        api_key = os.getenv("GOOGLE_API_KEY", "AIzaSyCnhkm10JspaX-SPOw8eCtDeYsu8l52fiA")
+        genai.configure(api_key=api_key)
         model_name = "Gemma 3"
         
         self.llm_questions = Gemini(

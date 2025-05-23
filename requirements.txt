@@ -12,3 +12,5 @@ nest_asyncio
 falkordb
 llama-index-graph-stores-falkordb
 llama-index-llms-together
+google-generativeai
+llama-index-llms-gemini
