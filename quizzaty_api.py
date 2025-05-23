@@ -59,9 +59,9 @@ class input_body(BaseModel):
 # graphRAG class
 class graphRAG:
     # variables
-    llm_graph_1 = None
-    llm_graph_2 = None
-    llm_graph_3 = None
+    llm_1 = None
+    llm_2 = None
+    llm_3 = None
     llm_graph_4 = None
     llm_graph= None
     llm_questions = None
@@ -112,6 +112,21 @@ class graphRAG:
             api_key="AIzaSyAwuVnbkTAMhR5-DxwYzwBN9-vilX_bnXY",
             max_retries=2
         )
+        self.llm_1 = Gemini(
+            model=model_name,
+            api_key="AIzaSyBQfIuQshM7o4aM2t3kxC3bie67eCGG3Kk",
+            max_retries=2
+        )
+        self.llm_2 = Gemini(
+            model=model_name,
+            api_key="AIzaSyDgFA3k1ayTmqzuEzuFKCpGlXKko9otX6o",
+            max_retries=2
+        )
+        self.llm_3 = Gemini(
+            model=model_name,
+            api_key="AIzaSyBK1p3akSoS5ioEuMfuYD4Bq7K7pXqKnjw",
+            max_retries=2
+        )
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
         Settings.chunk_size = 500
@@ -140,20 +155,6 @@ class graphRAG:
         # Create storage context with the graph store
         storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
         
-        # Set global settings
-        # Settings.num_workers = 4
-        # Settings.llm = self.llm_questions
-        # self.index = PropertyGraphIndex.from_documents(
-        #     doc,
-        #     llm=self.llm_questions,
-        #     embed_model=self.embedding_model,
-        #     storage_context=storage_context,  # Use the created storage context
-        #     show_progress=True,
-        #     num_workers=2,
-        #     chunk_size=1024,  # Process 1024 tokens per chunk
-        #     chunk_overlap=100,  # 300 token overlap between chunks
-        #     chunk_sleep_time=90.0  # Sleep 1 second between chunks
-        # )
         # Initialize text splitter with specified chunk size and overlap
         text_splitter = TokenTextSplitter(
             chunk_size=Settings.chunk_size,
@@ -170,32 +171,118 @@ class graphRAG:
             
         # Replace original documents with chunked version
         doc = chunked_docs
-        print(f"doc : {len(doc)}")
+        print(f"Total chunks to process: {len(doc)}")
         
         # Start timer
         start_time = time.time()
-        chunk_start_time = start_time
         
-        for i, single_doc in enumerate(doc):
-            self.index = PropertyGraphIndex.from_documents(
-                [single_doc],
-                llm=self.llm_questions,
-                embed_model=self.embedding_model,
-                storage_context=storage_context,
-                # show_progress=True
-            )
-            # Sleep for 30 seconds after every 30 chunks
-            if (i + 1) % 50 == 0:
-                chunk_end_time = time.time()
-                chunk_duration = chunk_end_time - chunk_start_time
-                print(f"Processed chunks {i-48} to {i+1} in {chunk_duration:.2f} seconds")
-                time.sleep(30)
-                chunk_start_time = time.time()  # Reset timer for next batch
+        # Create a list of LLMs to use with their names
+        llms = [
+            (self.llm_1, "LLM_1"),
+            (self.llm_2, "LLM_2"),
+            (self.llm_3, "LLM_3"),
+            (self.llm_questions, "LLM_Questions")
+        ]
+        
+        # Dictionary to track processing times for each LLM
+        llm_processing_times = {name: [] for _, name in llms}
+        llm_chunk_counts = {name: 0 for _, name in llms}
+        
+        async def process_chunk(chunk, llm_tuple, chunk_index):
+            llm, llm_name = llm_tuple
+            chunk_start = time.time()
+            try:
+                print(f"\n{llm_name} starting to process chunk {chunk_index}")
+                result = await asyncio.to_thread(
+                    PropertyGraphIndex.from_documents,
+                    [chunk],
+                    llm=llm,
+                    embed_model=self.embedding_model,
+                    storage_context=storage_context
+                )
+                chunk_end = time.time()
+                processing_time = chunk_end - chunk_start
+                llm_processing_times[llm_name].append(processing_time)
+                llm_chunk_counts[llm_name] += 1
+                print(f"{llm_name} completed chunk {chunk_index} in {processing_time:.2f} seconds")
+                return result
+            except Exception as e:
+                chunk_end = time.time()
+                processing_time = chunk_end - chunk_start
+                print(f"Error in {llm_name} processing chunk {chunk_index}: {str(e)}")
+                print(f"Failed chunk took {processing_time:.2f} seconds")
+                return None
+
+        async def process_batch(batch_chunks, llm_tuple, batch_number):
+            llm, llm_name = llm_tuple
+            batch_start = time.time()
+            print(f"\n{llm_name} starting batch {batch_number} with {len(batch_chunks)} chunks")
+            
+            tasks = []
+            for j, chunk in enumerate(batch_chunks):
+                chunk_index = (batch_number * len(batch_chunks)) + j
+                tasks.append(process_chunk(chunk, llm_tuple, chunk_index))
+            
+            results = await asyncio.gather(*tasks)
+            
+            # Update index with the last successful result
+            for result in results:
+                if result is not None:
+                    self.index = result
+            
+            batch_end = time.time()
+            batch_duration = batch_end - batch_start
+            print(f"\n{llm_name} completed batch {batch_number} in {batch_duration:.2f} seconds")
+            return batch_duration
+
+        # Calculate chunks per batch
+        chunks_per_batch = 50
+        total_batches = (len(doc) + chunks_per_batch - 1) // chunks_per_batch
+        
+        # Process batches in parallel, with each LLM handling its own batch
+        for batch_start in range(0, total_batches, len(llms)):
+            batch_tasks = []
+            for i, llm_tuple in enumerate(llms):
+                batch_number = batch_start + i
+                if batch_number >= total_batches:
+                    continue
+                    
+                start_idx = batch_number * chunks_per_batch
+                end_idx = min(start_idx + chunks_per_batch, len(doc))
+                batch_chunks = doc[start_idx:end_idx]
+                
+                batch_tasks.append(process_batch(batch_chunks, llm_tuple, batch_number))
+            
+            # Wait for all batches in this round to complete
+            batch_durations = await asyncio.gather(*batch_tasks)
+            
+            # Print round summary
+            print("\nRound Summary:")
+            for i, duration in enumerate(batch_durations):
+                llm_name = llms[i][1]
+                print(f"{llm_name} processed batch {batch_start + i} in {duration:.2f} seconds")
+            
+            # Sleep between rounds if there are more batches to process
+            if batch_start + len(llms) < total_batches:
+                print("\nSleeping for 30 seconds before next round...")
+                await asyncio.sleep(30)
         
         # End timer and calculate duration
         end_time = time.time()
         duration = end_time - start_time
+        
+        # Print final statistics
+        print("\nFinal Processing Statistics:")
         print(f"Total processing time: {duration:.2f} seconds ({duration/60:.2f} minutes)")
+        print("\nLLM Performance Summary:")
+        for llm_name in llm_processing_times:
+            if llm_chunk_counts[llm_name] > 0:
+                total_time = sum(llm_processing_times[llm_name])
+                avg_time = total_time / len(llm_processing_times[llm_name])
+                print(f"{llm_name}:")
+                print(f"  - Total chunks processed: {llm_chunk_counts[llm_name]}")
+                print(f"  - Total processing time: {total_time:.2f} seconds")
+                print(f"  - Average time per chunk: {avg_time:.2f} seconds")
         
         return self.index
 
