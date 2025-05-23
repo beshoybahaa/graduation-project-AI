@@ -193,13 +193,25 @@ class graphRAG:
             chunk_start = time.time()
             try:
                 print(f"\n{llm_name} starting to process chunk {chunk_index}")
-                result = await asyncio.to_thread(
-                    PropertyGraphIndex.from_documents,
-                    [chunk],
-                    llm=llm,
-                    embed_model=self.embedding_model,
-                    storage_context=storage_context
+                
+                # Create a new event loop for this chunk if needed
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                
+                # Process the chunk in a thread-safe way
+                result = await loop.run_in_executor(
+                    None,
+                    lambda: PropertyGraphIndex.from_documents(
+                        [chunk],
+                        llm=llm,
+                        embed_model=self.embedding_model,
+                        storage_context=storage_context
+                    )
                 )
+                
                 chunk_end = time.time()
                 processing_time = chunk_end - chunk_start
                 llm_processing_times[llm_name].append(processing_time)
@@ -218,17 +230,17 @@ class graphRAG:
             batch_start = time.time()
             print(f"\n{llm_name} starting batch {batch_number} with {len(batch_chunks)} chunks")
             
-            tasks = []
+            # Process chunks sequentially within a batch to avoid event loop issues
+            results = []
             for j, chunk in enumerate(batch_chunks):
                 chunk_index = (batch_number * len(batch_chunks)) + j
-                tasks.append(process_chunk(chunk, llm_tuple, chunk_index))
-            
-            results = await asyncio.gather(*tasks)
+                result = await process_chunk(chunk, llm_tuple, chunk_index)
+                if result is not None:
+                    results.append(result)
             
             # Update index with the last successful result
-            for result in results:
-                if result is not None:
-                    self.index = result
+            if results:
+                self.index = results[-1]
             
             batch_end = time.time()
             batch_duration = batch_end - batch_start
@@ -239,33 +251,47 @@ class graphRAG:
         chunks_per_batch = 50
         total_batches = (len(doc) + chunks_per_batch - 1) // chunks_per_batch
         
-        # Process batches in parallel, with each LLM handling its own batch
-        for batch_start in range(0, total_batches, len(llms)):
-            batch_tasks = []
-            for i, llm_tuple in enumerate(llms):
-                batch_number = batch_start + i
-                if batch_number >= total_batches:
-                    continue
+        try:
+            # Process batches in parallel, with each LLM handling its own batch
+            for batch_start in range(0, total_batches, len(llms)):
+                batch_tasks = []
+                for i, llm_tuple in enumerate(llms):
+                    batch_number = batch_start + i
+                    if batch_number >= total_batches:
+                        continue
+                        
+                    start_idx = batch_number * chunks_per_batch
+                    end_idx = min(start_idx + chunks_per_batch, len(doc))
+                    batch_chunks = doc[start_idx:end_idx]
                     
-                start_idx = batch_number * chunks_per_batch
-                end_idx = min(start_idx + chunks_per_batch, len(doc))
-                batch_chunks = doc[start_idx:end_idx]
+                    batch_tasks.append(process_batch(batch_chunks, llm_tuple, batch_number))
                 
-                batch_tasks.append(process_batch(batch_chunks, llm_tuple, batch_number))
-            
-            # Wait for all batches in this round to complete
-            batch_durations = await asyncio.gather(*batch_tasks)
-            
-            # Print round summary
-            print("\nRound Summary:")
-            for i, duration in enumerate(batch_durations):
-                llm_name = llms[i][1]
-                print(f"{llm_name} processed batch {batch_start + i} in {duration:.2f} seconds")
-            
-            # Sleep between rounds if there are more batches to process
-            if batch_start + len(llms) < total_batches:
-                print("\nSleeping for 30 seconds before next round...")
-                await asyncio.sleep(30)
+                # Wait for all batches in this round to complete
+                batch_durations = await asyncio.gather(*batch_tasks, return_exceptions=True)
+                
+                # Print round summary
+                print("\nRound Summary:")
+                for i, duration in enumerate(batch_durations):
+                    if isinstance(duration, Exception):
+                        print(f"Error in batch {batch_start + i}: {str(duration)}")
+                    else:
+                        llm_name = llms[i][1]
+                        print(f"{llm_name} processed batch {batch_start + i} in {duration:.2f} seconds")
+                
+                # Sleep between rounds if there are more batches to process
+                if batch_start + len(llms) < total_batches:
+                    print("\nSleeping for 30 seconds before next round...")
+                    try:
+                        await asyncio.sleep(30)
+                    except asyncio.CancelledError:
+                        print("Processing was cancelled during sleep")
+                        raise
+        except asyncio.CancelledError:
+            print("Processing was cancelled")
+            raise
+        except Exception as e:
+            print(f"Error during processing: {str(e)}")
+            raise
         
         # End timer and calculate duration
         end_time = time.time()
