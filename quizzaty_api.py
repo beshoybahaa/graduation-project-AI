@@ -106,7 +106,7 @@ class graphRAG:
         # Configure Gemini with API key from environment variable or fallback to hardcoded key
         # api_key = os.getenv("GOOGLE_API_KEY", "AIzaSyCnhkm10JspaX-SPOw8eCtDeYsu8l52fiA")
         # genai.configure(api_key="AIzaSyCnhkm10JspaX-SPOw8eCtDeYsu8l52fiA")
-        model_name = "Gemma 3"
+        model_name = "gemma-3-27b-it"
         self.llm_questions = Gemini(
             model=model_name,
             api_key="AIzaSyCnhkm10JspaX-SPOw8eCtDeYsu8l52fiA",
