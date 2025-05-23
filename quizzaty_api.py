@@ -104,12 +104,12 @@ class graphRAG:
     # load the model if not loaded
     def load_model(self):
         # Configure Gemini with API key from environment variable or fallback to hardcoded key
-        api_key = os.getenv("GOOGLE_API_KEY", "AIzaSyCnhkm10JspaX-SPOw8eCtDeYsu8l52fiA")
-        genai.configure(api_key=api_key)
+        # api_key = os.getenv("GOOGLE_API_KEY", "AIzaSyCnhkm10JspaX-SPOw8eCtDeYsu8l52fiA")
+        # genai.configure(api_key="AIzaSyCnhkm10JspaX-SPOw8eCtDeYsu8l52fiA")
         model_name = "Gemma 3"
-        
         self.llm_questions = Gemini(
             model=model_name,
+            api_key="AIzaSyCnhkm10JspaX-SPOw8eCtDeYsu8l52fiA",
             max_retries=2
         )
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
