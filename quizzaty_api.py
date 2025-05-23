@@ -59,9 +59,9 @@ class input_body(BaseModel):
 # graphRAG class
 class graphRAG:
     # variables
-    llm_1 = None
-    llm_2 = None
-    llm_3 = None
+    llm_graph_1 = None
+    llm_graph_2 = None
+    llm_graph_3 = None
     llm_graph_4 = None
     llm_graph= None
     llm_questions = None
@@ -155,6 +155,20 @@ class graphRAG:
         # Create storage context with the graph store
         storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
         
+        # Set global settings
+        # Settings.num_workers = 4
+        # Settings.llm = self.llm_questions
+        # self.index = PropertyGraphIndex.from_documents(
+        #     doc,
+        #     llm=self.llm_questions,
+        #     embed_model=self.embedding_model,
+        #     storage_context=storage_context,  # Use the created storage context
+        #     show_progress=True,
+        #     num_workers=2,
+        #     chunk_size=1024,  # Process 1024 tokens per chunk
+        #     chunk_overlap=100,  # 300 token overlap between chunks
+        #     chunk_sleep_time=90.0  # Sleep 1 second between chunks
+        # )
         # Initialize text splitter with specified chunk size and overlap
         text_splitter = TokenTextSplitter(
             chunk_size=Settings.chunk_size,
@@ -171,145 +185,37 @@ class graphRAG:
             
         # Replace original documents with chunked version
         doc = chunked_docs
-        print(f"Total chunks to process: {len(doc)}")
+        print(f"doc : {len(doc)}")
         
         # Start timer
         start_time = time.time()
-        
-        # Create a list of LLMs to use with their names
-        llms = [
-            (self.llm_1, "LLM_1"),
-            (self.llm_2, "LLM_2"),
-            (self.llm_3, "LLM_3"),
-            (self.llm_questions, "LLM_Questions")
-        ]
-        
-        # Dictionary to track processing times for each LLM
-        llm_processing_times = {name: [] for _, name in llms}
-        llm_chunk_counts = {name: 0 for _, name in llms}
-        
-        async def process_chunk(chunk, llm_tuple, chunk_index):
-            llm, llm_name = llm_tuple
-            chunk_start = time.time()
-            try:
-                print(f"\n{llm_name} starting to process chunk {chunk_index}")
-                
-                # Create a new event loop for this chunk if needed
-                try:
-                    loop = asyncio.get_event_loop()
-                except RuntimeError:
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-                
-                # Process the chunk in a thread-safe way
-                result = await loop.run_in_executor(
-                    None,
-                    lambda: PropertyGraphIndex.from_documents(
-                        [chunk],
-                        llm=llm,
-                        embed_model=self.embedding_model,
-                        storage_context=storage_context
-                    )
+        chunk_start_time = start_time
+
+        async def process_batch(batch,llm,llm_name, i):
+            for single_doc in batch:
+                self.index = PropertyGraphIndex.from_documents(
+                    [single_doc],
+                    llm=llm,
+                    embed_model=self.embedding_model,
+                    storage_context=storage_context,
+                    # show_progress=True
                 )
-                
-                chunk_end = time.time()
-                processing_time = chunk_end - chunk_start
-                llm_processing_times[llm_name].append(processing_time)
-                llm_chunk_counts[llm_name] += 1
-                print(f"{llm_name} completed chunk {chunk_index} in {processing_time:.2f} seconds")
-                return result
-            except Exception as e:
-                chunk_end = time.time()
-                processing_time = chunk_end - chunk_start
-                print(f"Error in {llm_name} processing chunk {chunk_index}: {str(e)}")
-                print(f"Failed chunk took {processing_time:.2f} seconds")
-                return None
+            chunk_end_time = time.time()
+            chunk_duration = chunk_end_time - chunk_start_time
+            print(f"Processed {llm_name} batch number {i} in {chunk_duration:.2f} seconds")
 
-        async def process_batch(batch_chunks, llm_tuple, batch_number):
-            llm, llm_name = llm_tuple
-            batch_start = time.time()
-            print(f"\n{llm_name} starting batch {batch_number} with {len(batch_chunks)} chunks")
-            
-            # Process chunks sequentially within a batch to avoid event loop issues
-            results = []
-            for j, chunk in enumerate(batch_chunks):
-                chunk_index = (batch_number * len(batch_chunks)) + j
-                result = await process_chunk(chunk, llm_tuple, chunk_index)
-                if result is not None:
-                    results.append(result)
-            
-            # Update index with the last successful result
-            if results:
-                self.index = results[-1]
-            
-            batch_end = time.time()
-            batch_duration = batch_end - batch_start
-            print(f"\n{llm_name} completed batch {batch_number} in {batch_duration:.2f} seconds")
-            return batch_duration
 
-        # Calculate chunks per batch
-        chunks_per_batch = 50
-        total_batches = (len(doc) + chunks_per_batch - 1) // chunks_per_batch
-        
-        try:
-            # Process batches in parallel, with each LLM handling its own batch
-            for batch_start in range(0, total_batches, len(llms)):
-                batch_tasks = []
-                for i, llm_tuple in enumerate(llms):
-                    batch_number = batch_start + i
-                    if batch_number >= total_batches:
-                        continue
-                        
-                    start_idx = batch_number * chunks_per_batch
-                    end_idx = min(start_idx + chunks_per_batch, len(doc))
-                    batch_chunks = doc[start_idx:end_idx]
-                    
-                    batch_tasks.append(process_batch(batch_chunks, llm_tuple, batch_number))
-                
-                # Wait for all batches in this round to complete
-                batch_durations = await asyncio.gather(*batch_tasks, return_exceptions=True)
-                
-                # Print round summary
-                print("\nRound Summary:")
-                for i, duration in enumerate(batch_durations):
-                    if isinstance(duration, Exception):
-                        print(f"Error in batch {batch_start + i}: {str(duration)}")
-                    else:
-                        llm_name = llms[i][1]
-                        print(f"{llm_name} processed batch {batch_start + i} in {duration:.2f} seconds")
-                
-                # Sleep between rounds if there are more batches to process
-                if batch_start + len(llms) < total_batches:
-                    print("\nSleeping for 30 seconds before next round...")
-                    try:
-                        await asyncio.sleep(30)
-                    except asyncio.CancelledError:
-                        print("Processing was cancelled during sleep")
-                        raise
-        except asyncio.CancelledError:
-            print("Processing was cancelled")
-            raise
-        except Exception as e:
-            print(f"Error during processing: {str(e)}")
-            raise
-        
-        # End timer and calculate duration
-        end_time = time.time()
-        duration = end_time - start_time
-        
-        # Print final statistics
-        print("\nFinal Processing Statistics:")
-        print(f"Total processing time: {duration:.2f} seconds ({duration/60:.2f} minutes)")
-        print("\nLLM Performance Summary:")
-        for llm_name in llm_processing_times:
-            if llm_chunk_counts[llm_name] > 0:
-                total_time = sum(llm_processing_times[llm_name])
-                avg_time = total_time / len(llm_processing_times[llm_name])
-                print(f"{llm_name}:")
-                print(f"  - Total chunks processed: {llm_chunk_counts[llm_name]}")
-                print(f"  - Total processing time: {total_time:.2f} seconds")
-                print(f"  - Average time per chunk: {avg_time:.2f} seconds")
-        
+        tasks = [
+        process_batch(doc[0:48], self.llm_questions, "llm_questions", 0),
+        process_batch(doc[48:96], self.llm_1, "llm_1", 1),
+        process_batch(doc[96:144], self.llm_2, "llm_2", 2),
+        process_batch(doc[144:192], self.llm_3, "llm_3", 3),
+        ]
+        await asyncio.gather(*tasks)
+        print("All tasks completed")
+        total_end_time = time.time()
+        total_duration = total_end_time - start_time
+        print(f"Total time taken: {total_duration:.2f} seconds")
         return self.index
 
     # load the index
