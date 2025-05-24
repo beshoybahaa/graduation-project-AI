@@ -218,10 +218,10 @@ class graphRAG:
             (doc[144:192], self.llm_3, "llm_3"),
         ]
 
-        # Run workflow
-        context = Context()
-        context.set("doc", doc)
-        context.set("llms", llms)
+        # Run workflow with proper context initialization
+        context = Context(workflow=workflow)
+        await context.set("doc", doc)
+        await context.set("llms", llms)
         
         result = await workflow.run(context)
         self.index = result.result
