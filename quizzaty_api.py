@@ -165,7 +165,7 @@ class graphRAG:
     async def index_doc(self, doc, path):
         print("Initializing shared SimpleGraphStore...")
         # Create storage context with the graph store
-        self.storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
+        storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
         
         # Set global settings
         # Settings.num_workers = 4
@@ -203,39 +203,44 @@ class graphRAG:
         start_time = time.time()
         chunk_start_time = start_time
 
-        def process_batch(batch, llm, llm_name, i):
-            for single_doc in batch:
-                self.index = PropertyGraphIndex.from_documents(
+        # Process batches sequentially but with parallel processing within each batch
+        from concurrent.futures import ThreadPoolExecutor
+        import threading
+
+        # Create a lock for thread-safe index updates
+        index_lock = threading.Lock()
+
+        def process_single_doc(single_doc, llm):
+            with index_lock:
+                return PropertyGraphIndex.from_documents(
                     [single_doc],
                     llm=llm,
                     embed_model=self.embedding_model,
                     storage_context=storage_context,
-                    # show_progress=True
                 )
+
+        # Process each batch with multiple threads
+        for i, (batch, llm, llm_name) in enumerate([
+            (doc[0:48], self.llm_questions, "llm_questions"),
+            (doc[48:96], self.llm_1, "llm_1"),
+            (doc[96:144], self.llm_2, "llm_2"),
+            (doc[144:192], self.llm_3, "llm_3"),
+        ]):
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                # Submit all documents in the batch for processing
+                futures = [executor.submit(process_single_doc, single_doc, llm) for single_doc in batch]
+                
+                # Wait for all futures to complete
+                for future in futures:
+                    self.index = future.result()
+
             chunk_end_time = time.time()
             chunk_duration = chunk_end_time - chunk_start_time
             print(f"Processed {llm_name} batch number {i} in {chunk_duration:.2f} seconds")
-        self.start_time = time.time()
-        self.chunk_start_time = self.start_time
-        # Create batches for parallel processing
-        batches = [
-            (doc[0:48], self.llm_questions, "llm_questions", 0),
-            (doc[48:96], self.llm_1, "llm_1", 1),
-            (doc[96:144], self.llm_2, "llm_2", 2),
-            (doc[144:192], self.llm_3, "llm_3", 3),
-        ]
-
-        # Use multiprocessing for parallel execution
-        from multiprocessing import Pool, cpu_count
-        
-        # Create a pool of workers (use number of CPU cores available)
-        with Pool(processes=min(len(batches), cpu_count())) as pool:
-            # Map the process_batch function to each batch
-            pool.starmap(self.process_batch, batches)
 
         print("All tasks completed")
         total_end_time = time.time()
-        total_duration = total_end_time - self.start_time
+        total_duration = total_end_time - start_time
         print(f"Total time taken: {total_duration:.2f} seconds")
         return self.index
 
