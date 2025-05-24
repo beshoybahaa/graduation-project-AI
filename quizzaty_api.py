@@ -7,7 +7,7 @@ import shutil
 import tempfile
 import time
 # from datetime import datetime
-from typing import Union, Annotated
+from typing import Union, Annotated, Any
 # from math import ceil
 # from functools import partial
 
@@ -35,6 +35,8 @@ from llama_index.core.indices.property_graph import (
     SimpleLLMPathExtractor,
 )
 from llama_index.core import Settings
+
+from llama_index.core.workflow import step, Context, Workflow, Event, StartEvent, StopEvent
 
 # from llama_index.graph_stores.falkordb import FalkorDBPropertyGraphStore
 # from dotenv import load_dotenv
@@ -162,6 +164,63 @@ class graphRAG:
         chunk_duration = chunk_end_time - self.chunk_start_time
         print(f"Processed {llm_name} batch number {i} in {chunk_duration:.2f} seconds")
 
+    class DocumentProcessEvent(Event):
+        document: Document
+        llm: Any
+        llm_name: str
+
+    class DocumentResultEvent(Event):
+        index: Any
+        llm_name: str
+
+    class ParallelIndexWorkflow(Workflow):
+        def __init__(self, embedding_model, storage_context):
+            self.embedding_model = embedding_model
+            self.storage_context = storage_context
+            self.index = None
+
+        @step
+        async def start(self, ctx: Context, ev: StartEvent) -> DocumentProcessEvent:
+            # Get the documents and LLMs from context
+            doc = await ctx.get("doc")
+            llms = await ctx.get("llms")
+            
+            # Send events for each document and LLM combination
+            for i, (batch, llm, llm_name) in enumerate(llms):
+                for single_doc in batch:
+                    ctx.send_event(DocumentProcessEvent(
+                        document=single_doc,
+                        llm=llm,
+                        llm_name=llm_name
+                    ))
+            return None
+
+        @step(num_workers=4)  # Process 4 documents in parallel
+        async def process_document(self, ev: DocumentProcessEvent) -> DocumentResultEvent:
+            index = await asyncio.to_thread(
+                PropertyGraphIndex.from_documents,
+                [ev.document],
+                llm=ev.llm,
+                embed_model=self.embedding_model,
+                storage_context=self.storage_context,
+            )
+            return DocumentResultEvent(index=index, llm_name=ev.llm_name)
+
+        @step
+        async def combine_results(self, ctx: Context, ev: DocumentResultEvent) -> StopEvent | None:
+            # Collect all results
+            results = ctx.collect_events(ev, [DocumentResultEvent] * len(await ctx.get("doc")))
+            if results is None:
+                return None
+
+            # Combine all indices
+            self.index = results[0].index  # Use the first index as base
+            for result in results[1:]:
+                # Merge the indices
+                self.index.merge(result.index)
+            
+            return StopEvent(result=self.index)
+
     async def index_doc(self, doc, path):
         print("Initializing shared SimpleGraphStore...")
         # Create storage context with the graph store
@@ -201,28 +260,28 @@ class graphRAG:
         
         # Start timer
         start_time = time.time()
-        chunk_start_time = start_time
 
-        # Process batches sequentially
-        for i, (batch, llm, llm_name) in enumerate([
+        # Create workflow instance
+        workflow = self.ParallelIndexWorkflow(
+            embedding_model=self.embedding_model,
+            storage_context=storage_context
+        )
+
+        # Prepare LLM batches
+        llms = [
             (doc[0:48], self.llm_questions, "llm_questions"),
             (doc[48:96], self.llm_1, "llm_1"),
             (doc[96:144], self.llm_2, "llm_2"),
             (doc[144:192], self.llm_3, "llm_3"),
-        ]):
-            # Process each document in the batch
-            for single_doc in batch:
-                self.index = await asyncio.to_thread(
-                    PropertyGraphIndex.from_documents,
-                    [single_doc],
-                    llm=llm,
-                    embed_model=self.embedding_model,
-                    storage_context=storage_context,
-                )
+        ]
 
-            chunk_end_time = time.time()
-            chunk_duration = chunk_end_time - chunk_start_time
-            print(f"Processed {llm_name} batch number {i} in {chunk_duration:.2f} seconds")
+        # Run workflow
+        context = Context()
+        context.set("doc", doc)
+        context.set("llms", llms)
+        
+        result = await workflow.run(context)
+        self.index = result.result
 
         print("All tasks completed")
         total_end_time = time.time()
