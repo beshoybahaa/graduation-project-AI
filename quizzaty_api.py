@@ -161,16 +161,28 @@ class graphRAG:
         batch_triplets = []
     
         for chunk in batch:
-            triplets = extract_triplets(
-                llm,
-                chunk,
-                max_triplets=20
+            # Create a path extractor for each chunk
+            path_extractor = SimpleLLMPathExtractor(
+                llm=llm,
+                max_paths=20
             )
-            batch_triplets.extend(triplets)
+            
+            # Extract paths from the chunk
+            paths = path_extractor.extract_paths(chunk.text)
+            
+            # Convert paths to triplets
+            for path in paths:
+                if len(path) >= 3:
+                    subject = path[0]
+                    predicate = path[1]
+                    obj = path[2]
+                    batch_triplets.append((subject, predicate, obj))
+                
         chunk_end_time = time.time()
         chunk_duration = chunk_end_time - chunk_start_time
         print(f"Processed {llm_name} batch number {i} in {chunk_duration:.2f} seconds")
-    
+        return batch_triplets
+
     async def index_doc(self, doc, path):
         print("Initializing shared SimpleGraphStore...")
         # Create storage context with the graph store
