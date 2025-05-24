@@ -163,67 +163,7 @@ class graphRAG:
         chunk_end_time = time.time()
         chunk_duration = chunk_end_time - self.chunk_start_time
         print(f"Processed {llm_name} batch number {i} in {chunk_duration:.2f} seconds")
-
-class DocumentProcessEvent(Event):
-    document: Document
-    llm: Any
-    llm_name: str
-
-class DocumentResultEvent(Event):
-    index: Any
-    llm_name: str
-
-class ParallelIndexWorkflow(Workflow):
-    def __init__(self, embedding_model, storage_context):
-        self.embedding_model = embedding_model
-        self.storage_context = storage_context
-        self.index = None
-
-    @step
-    async def start(self, ctx: Context, ev: StartEvent) -> DocumentProcessEvent:
-        # Get the documents and LLMs from context
-        doc = await ctx.get("doc")
-        llms = await ctx.get("llms")
-        
-        # Send events for each document and LLM combination
-        for i, (batch, llm, llm_name) in enumerate(llms):
-            for single_doc in batch:
-                ctx.send_event(DocumentProcessEvent(
-                    document=single_doc,
-                    llm=llm,
-                    llm_name=llm_name
-                ))
-        return None
-
-    @step(num_workers=4)  # Process 4 documents in parallel
-    async def process_document(self, ev: DocumentProcessEvent) -> DocumentResultEvent:
-        index = await asyncio.to_thread(
-            PropertyGraphIndex.from_documents,
-            [ev.document],
-            llm=ev.llm,
-            embed_model=self.embedding_model,
-            storage_context=self.storage_context,
-        )
-        return DocumentResultEvent(index=index, llm_name=ev.llm_name)
-
-    @step
-    async def combine_results(self, ctx: Context, ev: DocumentResultEvent) -> StopEvent | None:
-        # Collect all results
-        results = ctx.collect_events(ev, [DocumentResultEvent] * len(await ctx.get("doc")))
-        if results is None:
-            return None
-
-        # Combine all indices
-        self.index = results[0].index  # Use the first index as base
-        for result in results[1:]:
-            # Merge the indices
-            self.index.merge(result.index)
-        
-        return StopEvent(result=self.index)
-
-class graphRAG:
-    # ... existing code ...
-
+    
     async def index_doc(self, doc, path):
         print("Initializing shared SimpleGraphStore...")
         # Create storage context with the graph store
@@ -371,6 +311,64 @@ class graphRAG:
             item["chapterNo"] = chapter_number
     
         return json_data
+class DocumentProcessEvent(Event):
+    document: Document
+    llm: Any
+    llm_name: str
+
+class DocumentResultEvent(Event):
+    index: Any
+    llm_name: str
+
+class ParallelIndexWorkflow(Workflow):
+    def __init__(self, embedding_model, storage_context):
+        self.embedding_model = embedding_model
+        self.storage_context = storage_context
+        self.index = None
+
+    @step
+    async def start(self, ctx: Context, ev: StartEvent) -> DocumentProcessEvent:
+        # Get the documents and LLMs from context
+        doc = await ctx.get("doc")
+        llms = await ctx.get("llms")
+        
+        # Send events for each document and LLM combination
+        for i, (batch, llm, llm_name) in enumerate(llms):
+            for single_doc in batch:
+                ctx.send_event(DocumentProcessEvent(
+                    document=single_doc,
+                    llm=llm,
+                    llm_name=llm_name
+                ))
+        return None
+
+    @step(num_workers=4)  # Process 4 documents in parallel
+    async def process_document(self, ev: DocumentProcessEvent) -> DocumentResultEvent:
+        index = await asyncio.to_thread(
+            PropertyGraphIndex.from_documents,
+            [ev.document],
+            llm=ev.llm,
+            embed_model=self.embedding_model,
+            storage_context=self.storage_context,
+        )
+        return DocumentResultEvent(index=index, llm_name=ev.llm_name)
+
+    @step
+    async def combine_results(self, ctx: Context, ev: DocumentResultEvent) -> StopEvent | None:
+        # Collect all results
+        results = ctx.collect_events(ev, [DocumentResultEvent] * len(await ctx.get("doc")))
+        if results is None:
+            return None
+
+        # Combine all indices
+        self.index = results[0].index  # Use the first index as base
+        for result in results[1:]:
+            # Merge the indices
+            self.index.merge(result.index)
+        
+        return StopEvent(result=self.index)
+
+
 
 # create the app
 app = FastAPI()
