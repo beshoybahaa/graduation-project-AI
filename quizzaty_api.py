@@ -203,36 +203,22 @@ class graphRAG:
         start_time = time.time()
         chunk_start_time = start_time
 
-        # Process batches sequentially but with parallel processing within each batch
-        from concurrent.futures import ThreadPoolExecutor
-        import threading
-
-        # Create a lock for thread-safe index updates
-        index_lock = threading.Lock()
-
-        def process_single_doc(single_doc, llm):
-            with index_lock:
-                return PropertyGraphIndex.from_documents(
-                    [single_doc],
-                    llm=llm,
-                    embed_model=self.embedding_model,
-                    storage_context=storage_context,
-                )
-
-        # Process each batch with multiple threads
+        # Process batches sequentially
         for i, (batch, llm, llm_name) in enumerate([
             (doc[0:48], self.llm_questions, "llm_questions"),
             (doc[48:96], self.llm_1, "llm_1"),
             (doc[96:144], self.llm_2, "llm_2"),
             (doc[144:192], self.llm_3, "llm_3"),
         ]):
-            with ThreadPoolExecutor(max_workers=4) as executor:
-                # Submit all documents in the batch for processing
-                futures = [executor.submit(process_single_doc, single_doc, llm) for single_doc in batch]
-                
-                # Wait for all futures to complete
-                for future in futures:
-                    self.index = future.result()
+            # Process each document in the batch
+            for single_doc in batch:
+                self.index = await asyncio.to_thread(
+                    PropertyGraphIndex.from_documents,
+                    [single_doc],
+                    llm=llm,
+                    embed_model=self.embedding_model,
+                    storage_context=storage_context,
+                )
 
             chunk_end_time = time.time()
             chunk_duration = chunk_end_time - chunk_start_time
