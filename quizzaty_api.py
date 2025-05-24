@@ -322,6 +322,7 @@ class DocumentResultEvent(Event):
 
 class ParallelIndexWorkflow(Workflow):
     def __init__(self, embedding_model, storage_context):
+        super().__init__()  # Initialize the parent Workflow class
         self.embedding_model = embedding_model
         self.storage_context = storage_context
         self.index = None
