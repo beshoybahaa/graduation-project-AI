@@ -83,15 +83,33 @@ class graphRAG:
         self.upload_dir = tempfile.mkdtemp()
         
         try:
-            # Connect to FalkorDB Docker container
-            self.graph_store = FalkorDBGraphStore(
-                "redis://0.0.0.0:6379",  # Docker container port
-                decode_responses=True
-            )
+            # Connect to FalkorDB Docker container with retry logic
+            max_retries = 3
+            retry_delay = 2  # seconds
+            
+            for attempt in range(max_retries):
+                try:
+                    self.graph_store = FalkorDBGraphStore(
+                        "redis://0.0.0.0:6379",  # Docker container port
+                        decode_responses=True,
+                        socket_timeout=30,  # Increase timeout
+                        socket_connect_timeout=30,  # Increase connection timeout
+                        retry_on_timeout=True
+                    )
+                    # Test connection
+                    self.graph_store.clear()  # Clear existing data
+                    break
+                except Exception as e:
+                    if attempt == max_retries - 1:
+                        print(f"Warning: Could not connect to FalkorDB after {max_retries} attempts: {str(e)}")
+                        print("Falling back to in-memory graph store")
+                        self.graph_store = SimpleGraphStore()
+                    else:
+                        print(f"Connection attempt {attempt + 1} failed, retrying in {retry_delay} seconds...")
+                        time.sleep(retry_delay)
         except Exception as e:
             print(f"Warning: Could not connect to FalkorDB: {str(e)}")
             print("Falling back to in-memory graph store")
-            # Fallback to in-memory graph store if FalkorDB is not available
             self.graph_store = SimpleGraphStore()
 
     def __del__(self):
@@ -165,11 +183,8 @@ class graphRAG:
         print(f"Processed {llm_name} batch number {i} in {chunk_duration:.2f} seconds")
     
     async def index_doc(self, doc, path):
-        print("Initializing shared SimpleGraphStore...")
-        # Create storage context with the graph store
-        storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
-        
-        # Set global settings
+
+                # Set global settings
         # Settings.num_workers = 4
         # Settings.llm = self.llm_questions
         # self.index = PropertyGraphIndex.from_documents(
@@ -183,54 +198,74 @@ class graphRAG:
         #     chunk_overlap=100,  # 300 token overlap between chunks
         #     chunk_sleep_time=90.0  # Sleep 1 second between chunks
         # )
-        # Initialize text splitter with specified chunk size and overlap
-        text_splitter = TokenTextSplitter(
-            chunk_size=Settings.chunk_size,
-            chunk_overlap=Settings.chunk_overlap
-        )
-        
-        # Process each document and split into chunks
-        chunked_docs = []
-        for document in doc:
-            chunks = text_splitter.split_text(document.text)
-            # Convert chunks back to Document objects
-            doc_chunks = [Document(text=chunk) for chunk in chunks]
-            chunked_docs.extend(doc_chunks)
+
+        print("Initializing shared SimpleGraphStore...")
+        try:
+            # Clear existing data before creating new index
+            self.graph_store.clear()
             
-        # Replace original documents with chunked version
-        doc = chunked_docs
-        print(f"doc : {len(doc)}")
-        
-        # Start timer
-        start_time = time.time()
+            # Create storage context with the graph store
+            storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
+            
+            # Initialize text splitter with specified chunk size and overlap
+            text_splitter = TokenTextSplitter(
+                chunk_size=Settings.chunk_size,
+                chunk_overlap=Settings.chunk_overlap
+            )
+            
+            # Process each document and split into chunks
+            chunked_docs = []
+            for document in doc:
+                chunks = text_splitter.split_text(document.text)
+                # Convert chunks back to Document objects
+                doc_chunks = [Document(text=chunk) for chunk in chunks]
+                chunked_docs.extend(doc_chunks)
+                
+            # Replace original documents with chunked version
+            doc = chunked_docs
+            print(f"doc : {len(doc)}")
+            
+            # Start timer
+            start_time = time.time()
 
-        # Create workflow instance
-        workflow = ParallelIndexWorkflow(
-            embedding_model=self.embedding_model,
-            storage_context=storage_context
-        )
+            # Create workflow instance
+            workflow = ParallelIndexWorkflow(
+                embedding_model=self.embedding_model,
+                storage_context=storage_context
+            )
 
-        # Prepare LLM batches
-        llms = [
-            (doc[0:48], self.llm_questions, "llm_questions"),
-            (doc[48:96], self.llm_1, "llm_1"),
-            (doc[96:144], self.llm_2, "llm_2"),
-            (doc[144:192], self.llm_3, "llm_3"),
-        ]
+            # Prepare LLM batches with smaller batch sizes
+            batch_size = 24  # Reduced from 48 to handle resource constraints
+            llms = [
+                (doc[0:batch_size], self.llm_questions, "llm_questions"),
+                (doc[batch_size:batch_size*2], self.llm_1, "llm_1"),
+                (doc[batch_size*2:batch_size*3], self.llm_2, "llm_2"),
+                (doc[batch_size*3:batch_size*4], self.llm_3, "llm_3"),
+            ]
 
-        # Run workflow with proper context initialization
-        context = Context(workflow=workflow)
-        await context.set("doc", doc)
-        await context.set("llms", llms)
-        
-        result = await workflow.run(context)
-        self.index = result.result
+            # Run workflow with proper context initialization
+            context = Context(workflow=workflow)
+            await context.set("doc", doc)
+            await context.set("llms", llms)
+            
+            # Add delay between batches to prevent resource contention
+            result = await workflow.run(context)
+            self.index = result.result
 
-        print("All tasks completed")
-        total_end_time = time.time()
-        total_duration = total_end_time - start_time
-        print(f"Total time taken: {total_duration:.2f} seconds")
-        return self.index
+            print("All tasks completed")
+            total_end_time = time.time()
+            total_duration = total_end_time - start_time
+            print(f"Total time taken: {total_duration:.2f} seconds")
+            return self.index
+            
+        except Exception as e:
+            print(f"Error during indexing: {str(e)}")
+            # Clear the graph store on error
+            try:
+                self.graph_store.clear()
+            except:
+                pass
+            raise
 
     # load the index
     def load_index(self, path):
