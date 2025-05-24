@@ -254,6 +254,7 @@ class graphRAG:
         self.index = PropertyGraphIndex.from_graph_store(
             graph_store=graph_store,
             service_context=service_context,
+            storage_context = storage_context
         )
 
         print("All tasks completed")
