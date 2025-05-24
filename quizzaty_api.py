@@ -191,7 +191,7 @@ class graphRAG:
         start_time = time.time()
         chunk_start_time = start_time
 
-        async def process_batch(batch,llm,llm_name, i):
+        def process_batch(batch, llm, llm_name, i):
             for single_doc in batch:
                 self.index = PropertyGraphIndex.from_documents(
                     [single_doc],
@@ -204,14 +204,22 @@ class graphRAG:
             chunk_duration = chunk_end_time - chunk_start_time
             print(f"Processed {llm_name} batch number {i} in {chunk_duration:.2f} seconds")
 
-
-        tasks = [
-        process_batch(doc[0:48], self.llm_questions, "llm_questions", 0),
-        process_batch(doc[48:96], self.llm_1, "llm_1", 1),
-        process_batch(doc[96:144], self.llm_2, "llm_2", 2),
-        process_batch(doc[144:192], self.llm_3, "llm_3", 3),
+        # Create batches for parallel processing
+        batches = [
+            (doc[0:48], self.llm_questions, "llm_questions", 0),
+            (doc[48:96], self.llm_1, "llm_1", 1),
+            (doc[96:144], self.llm_2, "llm_2", 2),
+            (doc[144:192], self.llm_3, "llm_3", 3),
         ]
-        await asyncio.gather(*tasks)
+
+        # Use multiprocessing for parallel execution
+        from multiprocessing import Pool, cpu_count
+        
+        # Create a pool of workers (use number of CPU cores available)
+        with Pool(processes=min(len(batches), cpu_count())) as pool:
+            # Map the process_batch function to each batch
+            pool.starmap(process_batch, batches)
+
         print("All tasks completed")
         total_end_time = time.time()
         total_duration = total_end_time - start_time
