@@ -223,34 +223,35 @@ class graphRAG:
             [self.llm_3, "llm_3"],
         ]
 
-        batch_size = len(doc) // 4 + 1
-        batches = [
-            doc[i:i + batch_size] 
-            for i in range(0, len(doc), batch_size)
-        ]
+        # Calculate optimal batch size based on number of documents and available LLMs
+        num_llms = len(llms)
+        batch_size = max(1, len(doc) // num_llms)
+        batches = [doc[i:i + batch_size] for i in range(0, len(doc), batch_size)]
 
-        # Process batches in parallel
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-            futures = []
-            for i, batch in enumerate(batches):
-                llm, llm_name = llms[i % 4]
-                future = executor.submit(
+        # Process batches in parallel using ThreadPoolExecutor
+        with concurrent.futures.ThreadPoolExecutor(max_workers=num_llms) as executor:
+            # Submit all batch processing tasks
+            future_to_batch = {
+                executor.submit(
                     self.process_batch,
                     batch,
-                    llm,
-                    llm_name,
+                    llms[i % num_llms][0],  # LLM instance
+                    llms[i % num_llms][1],  # LLM name
                     i,
                     start_time
-                )
-                futures.append(future)
+                ): i for i, batch in enumerate(batches)
+            }
             
+            # Collect results as they complete
             all_triplets = []
-            for future in concurrent.futures.as_completed(futures):
+            for future in concurrent.futures.as_completed(future_to_batch):
+                batch_index = future_to_batch[future]
                 try:
                     batch_result = future.result()
                     all_triplets.extend(batch_result)
+                    print(f"Completed batch {batch_index}")
                 except Exception as exc:
-                    print(f"Batch processing failed: {exc}")
+                    print(f"Batch {batch_index} processing failed: {exc}")
 
         # Create a property graph store and add all triplets
         graph_store = SimplePropertyGraphStore()
