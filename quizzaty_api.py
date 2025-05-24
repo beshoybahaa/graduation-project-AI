@@ -163,7 +163,7 @@ class graphRAG:
             # Create a path extractor for each chunk
             path_extractor = SimpleLLMPathExtractor(
                 llm=llm,
-                max_paths=20
+                max_paths_per_chunk=20
             )
             
             # Extract paths from the chunk
