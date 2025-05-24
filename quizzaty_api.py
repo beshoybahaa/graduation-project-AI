@@ -166,8 +166,11 @@ class graphRAG:
                 max_paths_per_chunk=20
             )
             
-            # Extract paths from the chunk
-            paths = path_extractor.extract_paths_from_text(chunk.text)
+            # Create a node from the chunk
+            node = Document(text=chunk)
+            
+            # Extract paths from the node
+            paths = path_extractor.extract_paths_from_nodes([node])
             
             # Convert paths to triplets
             for path in paths:
