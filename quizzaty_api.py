@@ -31,7 +31,6 @@ from llama_index.graph_stores.falkordb import FalkorDBGraphStore
 from llama_index.core.node_parser import TokenTextSplitter
 from llama_index.core.graph_stores import SimplePropertyGraphStore
 from llama_index.core import Document, ServiceContext
-from llama_index.core.indices.property_graph.utils import extract_triplets
 import concurrent.futures
 
 
