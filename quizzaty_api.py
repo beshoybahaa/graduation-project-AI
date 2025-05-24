@@ -160,25 +160,29 @@ class graphRAG:
         batch_triplets = []
     
         for chunk in batch:
-            # Create a path extractor for each chunk
-            path_extractor = SimpleLLMPathExtractor(
-                llm=llm,
-                max_paths_per_chunk=20
-            )
-            
-            # Create a node from the chunk's text content
-            node = Document(text=str(chunk.text))
-            
-            # Extract paths from the node
-            paths = path_extractor.extract_paths([node])
-            
-            # Convert paths to triplets
-            for path in paths:
-                if len(path) >= 3:
-                    subject = path[0]
-                    predicate = path[1]
-                    obj = path[2]
-                    batch_triplets.append((subject, predicate, obj))
+            try:
+                # Create a path extractor for each chunk
+                path_extractor = SimpleLLMPathExtractor(
+                    llm=llm,
+                    max_paths_per_chunk=20
+                )
+                
+                # Create a node from the chunk's text content
+                node = Document(text=str(chunk.text))
+                
+                # Extract paths from the node
+                paths = path_extractor.extract_paths([node])
+                
+                # Convert paths to triplets
+                for path in paths:
+                    if len(path) >= 3:
+                        subject = path[0]
+                        predicate = path[1]
+                        obj = path[2]
+                        batch_triplets.append((subject, predicate, obj))
+            except Exception as e:
+                print(f"Error processing chunk: {str(e)}")
+                continue
                 
         chunk_end_time = time.time()
         chunk_duration = chunk_end_time - chunk_start_time
