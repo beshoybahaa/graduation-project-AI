@@ -150,10 +150,22 @@ class graphRAG:
             print(f"Error loading document: {str(e)}")
             raise
 
+    def process_batch(self, batch, llm, llm_name, i):
+        for single_doc in batch:
+            self.index = PropertyGraphIndex.from_documents(
+                [single_doc],
+                llm=llm,
+                embed_model=self.embedding_model,
+                storage_context=self.storage_context,
+            )
+        chunk_end_time = time.time()
+        chunk_duration = chunk_end_time - self.chunk_start_time
+        print(f"Processed {llm_name} batch number {i} in {chunk_duration:.2f} seconds")
+
     async def index_doc(self, doc, path):
         print("Initializing shared SimpleGraphStore...")
         # Create storage context with the graph store
-        storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
+        self.storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
         
         # Set global settings
         # Settings.num_workers = 4
@@ -203,7 +215,8 @@ class graphRAG:
             chunk_end_time = time.time()
             chunk_duration = chunk_end_time - chunk_start_time
             print(f"Processed {llm_name} batch number {i} in {chunk_duration:.2f} seconds")
-
+        self.start_time = time.time()
+        self.chunk_start_time = self.start_time
         # Create batches for parallel processing
         batches = [
             (doc[0:48], self.llm_questions, "llm_questions", 0),
@@ -218,11 +231,11 @@ class graphRAG:
         # Create a pool of workers (use number of CPU cores available)
         with Pool(processes=min(len(batches), cpu_count())) as pool:
             # Map the process_batch function to each batch
-            pool.starmap(process_batch, batches)
+            pool.starmap(self.process_batch, batches)
 
         print("All tasks completed")
         total_end_time = time.time()
-        total_duration = total_end_time - start_time
+        total_duration = total_end_time - self.start_time
         print(f"Total time taken: {total_duration:.2f} seconds")
         return self.index
 
