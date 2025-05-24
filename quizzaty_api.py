@@ -236,15 +236,20 @@ class graphRAG:
             for i in range(0, len(doc), batch_size)
         ]
 
-        # Create processing arguments with batched chunks
-        processing_args = [
-            (self, batch, llms[i % 4][0], llms[i % 4][1], i, start_time)
-            for i, batch in enumerate(batches)
-        ]
-
         # Process batches in parallel
         with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-            futures = [executor.submit(self.process_batch, args) for args in processing_args]
+            futures = []
+            for i, batch in enumerate(batches):
+                llm, llm_name = llms[i % 4]
+                future = executor.submit(
+                    self.process_batch,
+                    batch,
+                    llm,
+                    llm_name,
+                    i,
+                    start_time
+                )
+                futures.append(future)
             
             all_triplets = []
             for future in concurrent.futures.as_completed(futures):
