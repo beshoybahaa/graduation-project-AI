@@ -29,6 +29,11 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.gemini import Gemini
 from llama_index.graph_stores.falkordb import FalkorDBGraphStore
 from llama_index.core.node_parser import TokenTextSplitter
+from llama_index.core.graph_stores import SimplePropertyGraphStore
+from llama_index.core import Document, ServiceContext
+from llama_index.core.indices.property_graph.utils import extract_triplets
+import concurrent.futures
+
 
 from llama_index.core.indices.property_graph import (
     ImplicitPathExtractor,
@@ -83,33 +88,15 @@ class graphRAG:
         self.upload_dir = tempfile.mkdtemp()
         
         try:
-            # Connect to FalkorDB Docker container with retry logic
-            max_retries = 3
-            retry_delay = 2  # seconds
-            
-            for attempt in range(max_retries):
-                try:
-                    self.graph_store = FalkorDBGraphStore(
-                        "redis://0.0.0.0:6379",  # Docker container port
-                        decode_responses=True,
-                        socket_timeout=30,  # Increase timeout
-                        socket_connect_timeout=30,  # Increase connection timeout
-                        retry_on_timeout=True
-                    )
-                    # Test connection
-                    self.graph_store.clear()  # Clear existing data
-                    break
-                except Exception as e:
-                    if attempt == max_retries - 1:
-                        print(f"Warning: Could not connect to FalkorDB after {max_retries} attempts: {str(e)}")
-                        print("Falling back to in-memory graph store")
-                        self.graph_store = SimpleGraphStore()
-                    else:
-                        print(f"Connection attempt {attempt + 1} failed, retrying in {retry_delay} seconds...")
-                        time.sleep(retry_delay)
+            # Connect to FalkorDB Docker container
+            self.graph_store = FalkorDBGraphStore(
+                "redis://0.0.0.0:6379",  # Docker container port
+                decode_responses=True
+            )
         except Exception as e:
             print(f"Warning: Could not connect to FalkorDB: {str(e)}")
             print("Falling back to in-memory graph store")
+            # Fallback to in-memory graph store if FalkorDB is not available
             self.graph_store = SimpleGraphStore()
 
     def __del__(self):
@@ -170,21 +157,26 @@ class graphRAG:
             print(f"Error loading document: {str(e)}")
             raise
 
-    def process_batch(self, batch, llm, llm_name, i):
-        for single_doc in batch:
-            self.index = PropertyGraphIndex.from_documents(
-                [single_doc],
-                llm=llm,
-                embed_model=self.embedding_model,
-                storage_context=self.storage_context,
+    def process_batch(self, batch, llm, llm_name, i, chunk_start_time):
+        batch_triplets = []
+    
+        for chunk in batch:
+            triplets = extract_triplets(
+                llm,
+                chunk,
+                max_triplets=20
             )
+            batch_triplets.extend(triplets)
         chunk_end_time = time.time()
-        chunk_duration = chunk_end_time - self.chunk_start_time
+        chunk_duration = chunk_end_time - chunk_start_time
         print(f"Processed {llm_name} batch number {i} in {chunk_duration:.2f} seconds")
     
     async def index_doc(self, doc, path):
-
-                # Set global settings
+        print("Initializing shared SimpleGraphStore...")
+        # Create storage context with the graph store
+        storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
+        
+        # Set global settings
         # Settings.num_workers = 4
         # Settings.llm = self.llm_questions
         # self.index = PropertyGraphIndex.from_documents(
@@ -198,74 +190,77 @@ class graphRAG:
         #     chunk_overlap=100,  # 300 token overlap between chunks
         #     chunk_sleep_time=90.0  # Sleep 1 second between chunks
         # )
+        # Initialize text splitter with specified chunk size and overlap
+        text_splitter = TokenTextSplitter(
+            chunk_size=Settings.chunk_size,
+            chunk_overlap=Settings.chunk_overlap
+        )
+        
+        # Process each document and split into chunks
+        chunked_docs = []
+        for document in doc:
+            chunks = text_splitter.split_text(document.text)
+            # Convert chunks back to Document objects
+            doc_chunks = [Document(text=chunk) for chunk in chunks]
+            chunked_docs.extend(doc_chunks)
+            
+        # Replace original documents with chunked version
+        doc = chunked_docs
+        print(f"doc : {len(doc)}")
+        
+        # Start timer
+        start_time = time.time()
 
-        print("Initializing shared SimpleGraphStore...")
-        try:
-            # Clear existing data before creating new index
-            self.graph_store.clear()
-            
-            # Create storage context with the graph store
-            storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
-            
-            # Initialize text splitter with specified chunk size and overlap
-            text_splitter = TokenTextSplitter(
-                chunk_size=Settings.chunk_size,
-                chunk_overlap=Settings.chunk_overlap
-            )
-            
-            # Process each document and split into chunks
-            chunked_docs = []
-            for document in doc:
-                chunks = text_splitter.split_text(document.text)
-                # Convert chunks back to Document objects
-                doc_chunks = [Document(text=chunk) for chunk in chunks]
-                chunked_docs.extend(doc_chunks)
-                
-            # Replace original documents with chunked version
-            doc = chunked_docs
-            print(f"doc : {len(doc)}")
-            
-            # Start timer
-            start_time = time.time()
+        # Prepare LLM batches
+        llms = [
+            [self.llm_questions, "llm_questions"],
+            [self.llm_1, "llm_1"],
+            [self.llm_2, "llm_2"],
+            [self.llm_3, "llm_3"],
+        ]
 
-            # Create workflow instance
-            workflow = ParallelIndexWorkflow(
-                embedding_model=self.embedding_model,
-                storage_context=storage_context
-            )
+        batch_size = len(doc) // 4 + 1
+        batches = [
+            doc[i:i + batch_size] 
+            for i in range(0, len(doc), batch_size)
+        ]
 
-            # Prepare LLM batches with smaller batch sizes
-            batch_size = 24  # Reduced from 48 to handle resource constraints
-            llms = [
-                (doc[0:batch_size], self.llm_questions, "llm_questions"),
-                (doc[batch_size:batch_size*2], self.llm_1, "llm_1"),
-                (doc[batch_size*2:batch_size*3], self.llm_2, "llm_2"),
-                (doc[batch_size*3:batch_size*4], self.llm_3, "llm_3"),
-            ]
+        # Create processing arguments with batched chunks
+        processing_args = [
+            (self, batch, llms[i % 4][0], llms[i % 4][1], i, start_time)
+            for i, batch in enumerate(batches)
+        ]
 
-            # Run workflow with proper context initialization
-            context = Context(workflow=workflow)
-            await context.set("doc", doc)
-            await context.set("llms", llms)
+        # Process batches in parallel
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            futures = [executor.submit(self.process_batch, args) for args in processing_args]
             
-            # Add delay between batches to prevent resource contention
-            result = await workflow.run(context)
-            self.index = result.result
+            all_triplets = []
+            for future in concurrent.futures.as_completed(futures):
+                try:
+                    batch_result = future.result()
+                    all_triplets.extend(batch_result)
+                except Exception as exc:
+                    print(f"Batch processing failed: {exc}")
 
-            print("All tasks completed")
-            total_end_time = time.time()
-            total_duration = total_end_time - start_time
-            print(f"Total time taken: {total_duration:.2f} seconds")
-            return self.index
-            
-        except Exception as e:
-            print(f"Error during indexing: {str(e)}")
-            # Clear the graph store on error
-            try:
-                self.graph_store.clear()
-            except:
-                pass
-            raise
+        graph_store = SimplePropertyGraphStore()
+        for triplet in all_triplets:
+            graph_store.upsert_triplet(*triplet)
+
+        # Create the Property Graph Index
+        service_context = ServiceContext.from_defaults(
+            llm=llms[0][0]  # Use first instance as default for queries
+        )
+        self.index = PropertyGraphIndex.from_graph_store(
+            graph_store=graph_store,
+            service_context=service_context,
+        )
+
+        print("All tasks completed")
+        total_end_time = time.time()
+        total_duration = total_end_time - start_time
+        print(f"Total time taken: {total_duration:.2f} seconds")
+        return self.index
 
     # load the index
     def load_index(self, path):
