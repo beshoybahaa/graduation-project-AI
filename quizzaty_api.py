@@ -166,8 +166,8 @@ class graphRAG:
                 max_paths_per_chunk=20
             )
             
-            # Create a node from the chunk
-            node = Document(text=chunk)
+            # Create a node from the chunk's text content
+            node = Document(text=str(chunk.text))
             
             # Extract paths from the node
             paths = path_extractor.extract_paths_from_nodes([node])
