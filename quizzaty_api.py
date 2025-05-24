@@ -167,7 +167,7 @@ class graphRAG:
             )
             
             # Extract paths from the chunk
-            paths = path_extractor.extract_paths_from_text(chunk.text)
+            paths = path_extractor.extract_paths_from_nodes([chunk])
             
             # Convert paths to triplets
             for path in paths:
