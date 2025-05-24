@@ -170,7 +170,7 @@ class graphRAG:
             node = Document(text=str(chunk.text))
             
             # Extract paths from the node
-            paths = path_extractor.extract_paths_from_nodes([node])
+            paths = path_extractor.extract_paths([node])
             
             # Convert paths to triplets
             for path in paths:
