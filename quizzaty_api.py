@@ -171,7 +171,7 @@ class graphRAG:
                 node = Document(text=str(chunk.text))
                 
                 # Extract paths from the node
-                paths = path_extractor.extract_paths([node])
+                paths = path_extractor.extract_paths_from_text(str(chunk.text))
                 
                 # Convert paths to triplets
                 for path in paths:
@@ -194,20 +194,6 @@ class graphRAG:
         # Create storage context with the graph store
         storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
         
-        # Set global settings
-        # Settings.num_workers = 4
-        # Settings.llm = self.llm_questions
-        # self.index = PropertyGraphIndex.from_documents(
-        #     doc,
-        #     llm=self.llm_questions,
-        #     embed_model=self.embedding_model,
-        #     storage_context=storage_context,  # Use the created storage context
-        #     show_progress=True,
-        #     num_workers=2,
-        #     chunk_size=1024,  # Process 1024 tokens per chunk
-        #     chunk_overlap=100,  # 300 token overlap between chunks
-        #     chunk_sleep_time=90.0  # Sleep 1 second between chunks
-        # )
         # Initialize text splitter with specified chunk size and overlap
         text_splitter = TokenTextSplitter(
             chunk_size=Settings.chunk_size,
@@ -266,18 +252,21 @@ class graphRAG:
                 except Exception as exc:
                     print(f"Batch processing failed: {exc}")
 
+        # Create a property graph store and add all triplets
         graph_store = SimplePropertyGraphStore()
         for triplet in all_triplets:
             graph_store.upsert_triplet(*triplet)
 
-        # Create the Property Graph Index
+        # Create the Property Graph Index with the processed graph store
         service_context = ServiceContext.from_defaults(
-            llm=llms[0][0]  # Use first instance as default for queries
+            llm=self.llm_questions,  # Use the main LLM for queries
+            embed_model=self.embedding_model
         )
+        
         self.index = PropertyGraphIndex.from_graph_store(
             graph_store=graph_store,
             service_context=service_context,
-            storage_context = storage_context
+            storage_context=storage_context
         )
 
         print("All tasks completed")
