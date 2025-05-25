@@ -88,8 +88,7 @@ class GraphRAG:
         try:
             self.graph = FalkorDBGraph(
                 host="0.0.0.0",
-                port=6379,
-                decode_responses=True
+                port=6379
             )
         except Exception as e:
             print(f"Warning: Could not connect to FalkorDB: {str(e)}")
