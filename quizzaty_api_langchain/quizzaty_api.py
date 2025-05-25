@@ -16,7 +16,8 @@ from pydantic import BaseModel
 import google.generativeai as genai
 
 # LangChain imports
-from langchain_community.embeddings import HuggingFaceEmbeddings
+# from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.chains import GraphQAChain
 from langchain_community.llms import GoogleGenerativeAI
