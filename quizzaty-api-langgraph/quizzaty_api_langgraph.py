@@ -89,22 +89,22 @@ class QuizzatyAPI:
     def _setup_models(self):
         # Initialize Gemini models
         self.llm_questions = Gemini(
-            model="gemini-pro",
+            model="gemini-1.5-propro",
             api_key="AIzaSyAwuVnbkTAMhR5-DxwYzwBN9-vilX_bnXY",
             max_retries=2
         )
         self.llm_1 = Gemini(
-            model="gemini-pro",
+            model="gemini-1.5-pro",
             api_key="AIzaSyBQfIuQshM7o4aM2t3kxC3bie67eCGG3Kk",
             max_retries=2
         )
         self.llm_2 = Gemini(
-            model="gemini-pro",
+            model="gemini-1.5-pro",
             api_key="AIzaSyDgFA3k1ayTmqzuEzuFKCpGlXKko9otX6o",
             max_retries=2
         )
         self.llm_3 = Gemini(
-            model="gemini-pro",
+            model="gemini-1.5-pro",
             api_key="AIzaSyBK1p3akSoS5ioEuMfuYD4Bq7K7pXqKnjw",
             max_retries=2
         )
