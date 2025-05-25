@@ -171,30 +171,37 @@ class GraphRAG:
                     )
                     
                     # Extract key concepts and create relationships
-                    concepts = await self.llm_questions.agenerate(
+                    concepts_response = await self.llm_questions.agenerate(
                         [f"Extract key concepts from this text and return as a list: {chunk.page_content}"]
                     )
                     
-                    for concept in concepts.generations[0][0].text.split('\n'):
-                        if concept.strip():
-                            concept_id = f"concept_{hash(concept)}"
-                            # Create concept node and relationship using Cypher
-                            self.graph.query(
-                                """
-                                MATCH (c:Chunk {id: $chunk_id})
-                                MERGE (k:Concept {
-                                    id: $concept_id,
-                                    name: $concept_name,
-                                    type: 'concept'
-                                })
-                                CREATE (c)-[:CONTAINS]->(k)
-                                """,
-                                {
-                                    "chunk_id": node_id,
-                                    "concept_id": concept_id,
-                                    "concept_name": concept.strip()
-                                }
-                            )
+                    # Get the text from the response
+                    concepts_text = concepts_response.generations[0][0].text
+                    print(f"LLM Response: {concepts_text}")  # Debug log
+                    
+                    # Split the response into concepts
+                    concept_list = [c.strip() for c in concepts_text.split('\n') if c.strip()]
+                    print(f"Extracted concepts: {concept_list}")  # Debug log
+                    
+                    for concept in concept_list:
+                        concept_id = f"concept_{hash(concept)}"
+                        # Create concept node and relationship using Cypher
+                        self.graph.query(
+                            """
+                            MATCH (c:Chunk {id: $chunk_id})
+                            MERGE (k:Concept {
+                                id: $concept_id,
+                                name: $concept_name,
+                                type: 'concept'
+                            })
+                            CREATE (c)-[:CONTAINS]->(k)
+                            """,
+                            {
+                                "chunk_id": node_id,
+                                "concept_id": concept_id,
+                                "concept_name": concept
+                            }
+                        )
             else:
                 print("Warning: Graph database not available. Proceeding without graph structure.")
             
