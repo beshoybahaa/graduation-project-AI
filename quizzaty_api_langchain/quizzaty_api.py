@@ -154,13 +154,19 @@ class GraphRAG:
             # Process chunks and create graph nodes only if graph is available
             if self.graph:
                 for chunk in chunks:
-                    # Create nodes for each chunk
+                    # Create nodes for each chunk using Cypher
                     node_id = f"chunk_{hash(chunk.page_content)}"
-                    self.graph.add_node(
-                        node_id,
-                        properties={
-                            "content": chunk.page_content,
-                            "type": "chunk"
+                    self.graph.query(
+                        """
+                        CREATE (n:Chunk {
+                            id: $node_id,
+                            content: $content,
+                            type: 'chunk'
+                        })
+                        """,
+                        {
+                            "node_id": node_id,
+                            "content": chunk.page_content
                         }
                     )
                     
@@ -172,17 +178,22 @@ class GraphRAG:
                     for concept in concepts.generations[0][0].text.split('\n'):
                         if concept.strip():
                             concept_id = f"concept_{hash(concept)}"
-                            self.graph.add_node(
-                                concept_id,
-                                properties={
-                                    "name": concept.strip(),
-                                    "type": "concept"
+                            # Create concept node and relationship using Cypher
+                            self.graph.query(
+                                """
+                                MATCH (c:Chunk {id: $chunk_id})
+                                MERGE (k:Concept {
+                                    id: $concept_id,
+                                    name: $concept_name,
+                                    type: 'concept'
+                                })
+                                CREATE (c)-[:CONTAINS]->(k)
+                                """,
+                                {
+                                    "chunk_id": node_id,
+                                    "concept_id": concept_id,
+                                    "concept_name": concept.strip()
                                 }
-                            )
-                            self.graph.add_edge(
-                                node_id,
-                                concept_id,
-                                properties={"type": "contains"}
                             )
             else:
                 print("Warning: Graph database not available. Proceeding without graph structure.")
