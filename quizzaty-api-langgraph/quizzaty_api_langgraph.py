@@ -13,7 +13,8 @@ from pydantic import BaseModel
 import google.generativeai as genai
 from langgraph.graph import StateGraph, END
 from langgraph.prebuilt import ToolNode
-from langgraph.checkpoint import MemorySaver
+from langgraph.checkpoint.memory import MemorySaver
+
 
 # LlamaIndex imports
 from llama_index.core import (
