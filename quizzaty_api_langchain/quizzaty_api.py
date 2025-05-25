@@ -248,7 +248,7 @@ class GraphRAG:
             if self.graph:
                 # Query the graph for relevant concepts
                 concepts = self.graph.query(
-                    "MATCH (c:concept) RETURN c.name as concept"
+                    "MATCH (c:Concept) RETURN c.name as concept"
                 )
                 context = "\n".join([c["concept"] for c in concepts])
             else:
