@@ -48,6 +48,10 @@ class ErrorResponse(BaseModel):
 
 # State management
 class QuizState(BaseModel):
+    model_config = {
+        "arbitrary_types_allowed": True
+    }
+    
     documents: Optional[List[Document]] = None
     index: Optional[PropertyGraphIndex] = None
     questions: Optional[List[Question]] = None
