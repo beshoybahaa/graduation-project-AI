@@ -30,6 +30,9 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.gemini import Gemini
 from llama_index.graph_stores.falkordb import FalkorDBGraphStore
 
+# Configure Gemini API
+genai.configure(api_key="AIzaSyAwuVnbkTAMhR5-DxwYzwBN9-vilX_bnXY")
+
 # Response models
 class Question(BaseModel):
     question: str
@@ -84,24 +87,24 @@ class QuizzatyAPI:
             self.graph_store = SimpleGraphStore()
 
     def _setup_models(self):
-        model_name = "models/gemini-pro"
+        # Initialize Gemini models
         self.llm_questions = Gemini(
-            model=model_name,
+            model="gemini-pro",
             api_key="AIzaSyAwuVnbkTAMhR5-DxwYzwBN9-vilX_bnXY",
             max_retries=2
         )
         self.llm_1 = Gemini(
-            model=model_name,
+            model="gemini-pro",
             api_key="AIzaSyBQfIuQshM7o4aM2t3kxC3bie67eCGG3Kk",
             max_retries=2
         )
         self.llm_2 = Gemini(
-            model=model_name,
+            model="gemini-pro",
             api_key="AIzaSyDgFA3k1ayTmqzuEzuFKCpGlXKko9otX6o",
             max_retries=2
         )
         self.llm_3 = Gemini(
-            model=model_name,
+            model="gemini-pro",
             api_key="AIzaSyBK1p3akSoS5ioEuMfuYD4Bq7K7pXqKnjw",
             max_retries=2
         )
