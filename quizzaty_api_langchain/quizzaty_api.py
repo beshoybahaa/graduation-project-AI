@@ -20,7 +20,7 @@ import google.generativeai as genai
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.chains import GraphQAChain
-from langchain_community.llms import GoogleGenerativeAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.schema import Document
@@ -52,22 +52,22 @@ class GraphRAG:
         self.upload_dir = tempfile.mkdtemp()
         
         # Initialize LLMs
-        self.llm_1 = GoogleGenerativeAI(
+        self.llm_1 = ChatGoogleGenerativeAI(
             model="gemini-pro",
             google_api_key="AIzaSyAwuVnbkTAMhR5-DxwYzwBN9-vilX_bnXY",
             temperature=0.7
         )
-        self.llm_2 = GoogleGenerativeAI(
+        self.llm_2 = ChatGoogleGenerativeAI(
             model="gemini-pro",
             google_api_key="AIzaSyBQfIuQshM7o4aM2t3kxC3bie67eCGG3Kk",
             temperature=0.7
         )
-        self.llm_3 = GoogleGenerativeAI(
+        self.llm_3 = ChatGoogleGenerativeAI(
             model="gemini-pro",
             google_api_key="AIzaSyDgFA3k1ayTmqzuEzuFKCpGlXKko9otX6o",
             temperature=0.7
         )
-        self.llm_questions = GoogleGenerativeAI(
+        self.llm_questions = ChatGoogleGenerativeAI(
             model="gemini-pro",
             google_api_key="AIzaSyBK1p3akSoS5ioEuMfuYD4Bq7K7pXqKnjw",
             temperature=0.7
