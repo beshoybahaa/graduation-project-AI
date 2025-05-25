@@ -25,7 +25,7 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.schema import Document
 from langchain_community.document_loaders import PyPDFLoader
-from langchain.graphs import FalkorDBGraph
+from langchain_community.graphs import FalkorDBGraph
 from langchain.schema.runnable import RunnableParallel, RunnablePassthrough
 from langchain.schema.output_parser import StrOutputParser
 
@@ -87,7 +87,8 @@ class GraphRAG:
         # Initialize FalkorDB graph store
         try:
             self.graph = FalkorDBGraph(
-                url="redis://0.0.0.0:6379",
+                host="0.0.0.0",
+                port=6379,
                 decode_responses=True
             )
         except Exception as e:
