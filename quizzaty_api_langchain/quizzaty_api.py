@@ -126,6 +126,9 @@ class GraphRAG:
     async def process_documents(self, documents: List[Document]) -> None:
         """Process documents and create graph structure."""
         try:
+            # Store documents for later use
+            self.documents = documents
+            
             # Split documents into chunks
             chunks = self.text_splitter.split_documents(documents)
             
@@ -137,38 +140,41 @@ class GraphRAG:
                 }
             )
             
-            # Process chunks and create graph nodes
-            for chunk in chunks:
-                # Create nodes for each chunk
-                node_id = f"chunk_{hash(chunk.page_content)}"
-                self.graph.add_node(
-                    node_id,
-                    properties={
-                        "content": chunk.page_content,
-                        "type": "chunk"
-                    }
-                )
-                
-                # Extract key concepts and create relationships
-                concepts = await self.llm_questions.agenerate(
-                    [f"Extract key concepts from this text and return as a list: {chunk.page_content}"]
-                )
-                
-                for concept in concepts.generations[0][0].text.split('\n'):
-                    if concept.strip():
-                        concept_id = f"concept_{hash(concept)}"
-                        self.graph.add_node(
-                            concept_id,
-                            properties={
-                                "name": concept.strip(),
-                                "type": "concept"
-                            }
-                        )
-                        self.graph.add_edge(
-                            node_id,
-                            concept_id,
-                            properties={"type": "contains"}
-                        )
+            # Process chunks and create graph nodes only if graph is available
+            if self.graph:
+                for chunk in chunks:
+                    # Create nodes for each chunk
+                    node_id = f"chunk_{hash(chunk.page_content)}"
+                    self.graph.add_node(
+                        node_id,
+                        properties={
+                            "content": chunk.page_content,
+                            "type": "chunk"
+                        }
+                    )
+                    
+                    # Extract key concepts and create relationships
+                    concepts = await self.llm_questions.agenerate(
+                        [f"Extract key concepts from this text and return as a list: {chunk.page_content}"]
+                    )
+                    
+                    for concept in concepts.generations[0][0].text.split('\n'):
+                        if concept.strip():
+                            concept_id = f"concept_{hash(concept)}"
+                            self.graph.add_node(
+                                concept_id,
+                                properties={
+                                    "name": concept.strip(),
+                                    "type": "concept"
+                                }
+                            )
+                            self.graph.add_edge(
+                                node_id,
+                                concept_id,
+                                properties={"type": "contains"}
+                            )
+            else:
+                print("Warning: Graph database not available. Proceeding without graph structure.")
             
             # Create question generation chain
             question_prompt = PromptTemplate(
@@ -202,7 +208,7 @@ class GraphRAG:
                 prompt=question_prompt
             )
             
-            # Create graph QA chain
+            # Create graph QA chain only if graph is available
             if self.graph:
                 self.graph_chain = GraphQAChain.from_llm(
                     llm=self.llm_questions,
@@ -216,17 +222,16 @@ class GraphRAG:
     async def generate_questions(self, difficulty_level: str) -> List[Dict[str, Any]]:
         """Generate questions based on the graph structure."""
         try:
-            # Get context from graph
+            # Get context from graph or use document chunks
             if self.graph:
                 # Query the graph for relevant concepts
                 concepts = self.graph.query(
                     "MATCH (c:concept) RETURN c.name as concept"
                 )
-                
-                # Use concepts to generate questions
                 context = "\n".join([c["concept"] for c in concepts])
             else:
-                context = "No graph context available"
+                # If graph is not available, use the document chunks directly
+                context = "\n".join([chunk.page_content for chunk in self.text_splitter.split_documents(self.documents)])
             
             # Generate questions
             response = await self.question_chain.arun(
