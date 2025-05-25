@@ -14,6 +14,7 @@ from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import google.generativeai as genai
+import redis
 
 # LangChain imports
 # from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -86,10 +87,20 @@ class GraphRAG:
         
         # Initialize FalkorDB graph store
         try:
+            # First, try to connect to Redis to check if it's running
+            redis_client = redis.Redis(host="0.0.0.0", port=6379)
+            redis_client.ping()  # This will raise an exception if Redis is not running
+            
+            # If Redis is running, initialize FalkorDB with the database
             self.graph = FalkorDBGraph(
                 host="0.0.0.0",
-                port=6379
+                port=6379,
+                database="quizzaty_graph"
             )
+            print("Successfully connected to FalkorDB")
+        except redis.ConnectionError as e:
+            print(f"Warning: Could not connect to Redis: {str(e)}")
+            self.graph = None
         except Exception as e:
             print(f"Warning: Could not connect to FalkorDB: {str(e)}")
             self.graph = None
