@@ -179,8 +179,10 @@ class GraphRAG:
                     concepts_text = concepts_response.generations[0][0].text
                     print(f"LLM Response: {concepts_text}")  # Debug log
                     
-                    # Split the response into concepts
+                    # Split the response into concepts and clean them
                     concept_list = [c.strip() for c in concepts_text.split('\n') if c.strip()]
+                    # Remove any empty strings or very short concepts
+                    concept_list = [c for c in concept_list if len(c) > 2]
                     print(f"Extracted concepts: {concept_list}")  # Debug log
                     
                     for concept in concept_list:
