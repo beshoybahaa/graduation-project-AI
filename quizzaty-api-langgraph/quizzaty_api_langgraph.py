@@ -84,7 +84,7 @@ class QuizzatyAPI:
             self.graph_store = SimpleGraphStore()
 
     def _setup_models(self):
-        model_name = "gemma-3-27b-it"
+        model_name = "models/gemini-pro"
         self.llm_questions = Gemini(
             model=model_name,
             api_key="AIzaSyAwuVnbkTAMhR5-DxwYzwBN9-vilX_bnXY",
