@@ -252,7 +252,7 @@ class QuizzatyAPI:
             state = QuizState(current_difficulty=difficulty)
 
             # Run the graph
-            final_state = await self.graph.arun(state)
+            final_state = self.graph.run(state)
 
             if final_state.error:
                 raise HTTPException(status_code=500, detail=final_state.error)
