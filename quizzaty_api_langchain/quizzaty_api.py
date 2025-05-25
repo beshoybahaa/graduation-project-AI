@@ -230,14 +230,6 @@ class GraphRAG:
                 prompt=question_prompt
             )
             
-            # Create graph QA chain only if graph is available
-            if self.graph:
-                self.graph_chain = GraphQAChain.from_llm(
-                    llm=self.llm_questions,
-                    graph=self.graph,
-                    verbose=True
-                )
-            
         except Exception as e:
             raise Exception(f"Error processing documents: {str(e)}")
 
