@@ -169,7 +169,29 @@ class GraphRAG:
             )
             
             # Process the chunk and add to graph
-            await chain.arun(chunk.page_content)
+            print(f"Processing chunk {chunk_index} with content: {chunk.page_content[:100]}...")
+            result = await chain.arun(chunk.page_content)
+            print(f"Graph nodes after processing chunk {chunk_index}: {len(networkx_graph.graph.nodes())}")
+            print(f"Graph edges after processing chunk {chunk_index}: {len(networkx_graph.graph.edges())}")
+            
+            # Add the processed graph to Neo4j
+            for node, data in networkx_graph.graph.nodes(data=True):
+                self.graph.query(
+                    "MERGE (n:Entity {name: $name}) SET n += $properties",
+                    {"name": node, "properties": data}
+                )
+            
+            for source, target, data in networkx_graph.graph.edges(data=True):
+                self.graph.query(
+                    """
+                    MATCH (source:Entity {name: $source})
+                    MATCH (target:Entity {name: $target})
+                    MERGE (source)-[r:RELATES_TO]->(target)
+                    SET r += $properties
+                    """,
+                    {"source": source, "target": target, "properties": data}
+                )
+            
             return True
         except Exception as e:
             print(f"Error processing chunk {chunk_index}: {str(e)}")
@@ -213,15 +235,22 @@ class GraphRAG:
         print(f"Total indexing time: {end_time - start_time:.2f} seconds")
 
     async def generate_questions(self, difficulty_level: str) -> List[Dict]:
-        prompt_template = """You are an AI designed to generate multiple-choice questions (MCQs) based on a provided chapter of a book. Your task is to create a set of MCQs that focus on the main subject matter of the chapter. Ensure that each question is clear, concise, and relevant to the core themes of the chapter and be closed book style. Use the following structure for the MCQs:
-            
-            1. **Question Statement**: A clear and precise question related to the chapter content.
-            2. **Answer Choices**: Four options labeled A, B, C, and D, where only one option is correct. The incorrect options should be plausible to challenge the reader's knowledge.
-            3. **Correct Answer**: give me the correct answer of the question
+        prompt_template = """You are an AI designed to generate multiple-choice questions (MCQs) based on the knowledge graph extracted from a document. Your task is to create questions that test understanding of the relationships and concepts in the graph.
 
-            Generate 40 questions for {difficulty_level} level.
+            First, analyze the knowledge graph to understand the key concepts and their relationships.
+            Then, generate questions that test understanding of these concepts and relationships.
             
-            Format each question as a JSON object like this:
+            For {difficulty_level} level questions:
+            - Easy: Focus on basic facts and direct relationships
+            - Medium: Test understanding of relationships and intermediate concepts
+            - Hard: Challenge with complex relationships and deeper understanding
+            
+            Generate 40 questions following this structure:
+            1. Question Statement: Clear and precise
+            2. Four answer choices (A, B, C, D)
+            3. One correct answer
+            
+            Format each question as a JSON object:
             {{
                 "question": "Question text here",
                 "answerA": "Option A",
@@ -231,7 +260,7 @@ class GraphRAG:
                 "correctAnswer": "answerX"  // where X is A, B, C, or D
             }}
 
-            Use the graph database to extract relevant information for the questions."""
+            Use the knowledge graph to ensure questions are based on actual content from the document."""
 
         prompt = PromptTemplate(
             template=prompt_template,
@@ -249,12 +278,37 @@ class GraphRAG:
             verbose=True
         )
 
-        # Add a query parameter to the chain.run call
+        # First, get the graph data from Neo4j
+        graph_data = self.graph.query("""
+            MATCH (n:Entity)
+            OPTIONAL MATCH (n)-[r:RELATES_TO]->(m:Entity)
+            RETURN n, r, m
+        """)
+        
+        # Add the data to the Networkx graph
+        for record in graph_data:
+            if record['n']:
+                networkx_graph.graph.add_node(record['n']['name'], **record['n'])
+            if record['m']:
+                networkx_graph.graph.add_node(record['m']['name'], **record['m'])
+            if record['r']:
+                networkx_graph.graph.add_edge(
+                    record['n']['name'],
+                    record['m']['name'],
+                    **record['r']
+                )
+
+        print(f"Loaded graph with {len(networkx_graph.graph.nodes())} nodes and {len(networkx_graph.graph.edges())} edges")
+
+        # Generate questions using the populated graph
         response = await chain.arun(
-            query="Generate questions based on the document content",
+            query="Generate questions based on the relationships and concepts in the knowledge graph",
             difficulty_level=difficulty_level
         )
-        return self.extract_json_from_response(response)
+        
+        questions = self.extract_json_from_response(response)
+        print(f"Generated {len(questions)} questions for {difficulty_level} difficulty")
+        return questions
 
     def extract_json_from_response(self, response: str) -> List[Dict]:
         object_matches = re.findall(r'{[^{}]*?(?:"[^"]*":\s*"[^"]*?",?)*[^{}]*?}', response, re.DOTALL)
