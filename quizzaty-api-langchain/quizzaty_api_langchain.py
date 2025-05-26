@@ -13,11 +13,11 @@ import google.generativeai as genai
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain.graphs import FalkorGraph
+from langchain_community.vectorstores import Neo4jVector
 from langchain.chains import GraphQAChain
+from langchain.graphs import Neo4jGraph
 from langchain.prompts import PromptTemplate
 from langchain.schema import Document
-from langchain_community.vectorstores import Redis
 import nest_asyncio
 
 # Apply nest_asyncio
@@ -41,22 +41,24 @@ class GraphRAG:
         self.storage_dir = tempfile.mkdtemp()
         self.upload_dir = tempfile.mkdtemp()
         
-        # Initialize FalkorDB connection
+        # Initialize Neo4j connection
         try:
-            self.graph = FalkorGraph(
-                connection_string="redis://0.0.0.0:6379",
-                decode_responses=True
+            self.graph = Neo4jGraph(
+                url="bolt://localhost:7687",
+                username="neo4j",
+                password="password"  # Change this to your Neo4j password
             )
             
-            # Initialize Redis vector store
-            self.vector_store = Redis(
-                redis_url="redis://0.0.0.0:6379",
-                index_name="documents",
+            # Initialize Neo4j vector store
+            self.vector_store = Neo4jVector.from_existing_index(
                 embedding=self.embedding_model,
-                decode_responses=True
+                url="bolt://localhost:7687",
+                username="neo4j",
+                password="password",  # Change this to your Neo4j password
+                index_name="document_embeddings"
             )
         except Exception as e:
-            print(f"Warning: Could not connect to FalkorDB/Redis: {str(e)}")
+            print(f"Warning: Could not connect to Neo4j: {str(e)}")
             raise
 
         # Initialize LLMs
@@ -252,7 +254,7 @@ graphrag = GraphRAG()
 
 @app.get('/')
 def index():
-    return {'message': 'Quizaty API (LangChain Version)!'}
+    return {'message': 'Quizaty API (LangChain Version with Neo4j)!'}
 
 @app.post('/questions')
 async def predict(file: Annotated[UploadFile, File()]):

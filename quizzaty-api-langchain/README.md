@@ -1,11 +1,12 @@
-# Quizaty API (LangChain Version)
+# Quizaty API (LangChain Version with Neo4j)
 
-This is a FastAPI-based service that processes documents and generates multiple-choice questions using LangChain and FalkorDB for graph-based storage.
+This is a FastAPI-based service that processes documents and generates multiple-choice questions using LangChain and Neo4j for graph-based storage.
 
 ## Features
 
 - Document processing and chunking
-- Graph-based storage using FalkorDB
+- Graph-based storage using Neo4j
+- Vector storage using Neo4j Vector Search
 - Concurrent processing using multiple LLMs
 - Multiple-choice question generation
 - Support for different difficulty levels
@@ -14,7 +15,7 @@ This is a FastAPI-based service that processes documents and generates multiple-
 ## Prerequisites
 
 - Python 3.8+
-- Docker (for FalkorDB)
+- Neo4j Database (version 5.x)
 - Google API key for Gemini model
 
 ## Setup
@@ -29,9 +30,24 @@ This is a FastAPI-based service that processes documents and generates multiple-
    ```bash
    pip install -r requirements.txt
    ```
-4. Start FalkorDB using Docker:
+4. Start Neo4j Database:
    ```bash
-   docker run -d -p 6379:6379 falkordb/falkordb:latest
+   docker run -d \
+     --name neo4j \
+     -p 7474:7474 -p 7687:7687 \
+     -e NEO4J_AUTH=neo4j/password \
+     neo4j:5.14.1
+   ```
+
+5. Create the vector search index in Neo4j:
+   ```cypher
+   CREATE VECTOR INDEX document_embeddings IF NOT EXISTS
+   FOR (d:Document)
+   ON (d.embedding)
+   OPTIONS {indexConfig: {
+     `vector.dimensions`: 384,
+     `vector.similarity`: 'cosine'
+   }}
    ```
 
 ## Running the API
@@ -94,4 +110,5 @@ The API returns appropriate error responses with:
 - The API uses 4 concurrent LLMs for faster processing
 - Documents are processed in batches of 50 chunks
 - Rate limiting is implemented between API calls
-- Temporary files are automatically cleaned up 
+- Temporary files are automatically cleaned up
+- Neo4j is used for both graph storage and vector search 
