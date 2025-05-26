@@ -6,14 +6,15 @@ import re
 import shutil
 import tempfile
 import time
-from typing import Union, Annotated
+import random
 
 # Third-party imports
 import nest_asyncio
+import httpx
 from fastapi import FastAPI, UploadFile, Form, File
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-import google.generativeai as genai
+from typing import Annotated
 
 # LlamaIndex imports
 from llama_index.core import VectorStoreIndex, PropertyGraphIndex, StorageContext, load_index_from_storage, SimpleDirectoryReader, Document
@@ -23,39 +24,52 @@ from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.gemini import Gemini
 from llama_index.graph_stores.falkordb import FalkorDBGraphStore
 from llama_index.core.node_parser import TokenTextSplitter
+from llama_index.core.indices.property_graph import (
+    ImplicitPathExtractor,
+    SimpleLLMPathExtractor,
+)
 from llama_index.core import Settings
-from pydantic import SecretStr, SecretBytes  # Use these instead
 
-# Apply nest_asyncio
 nest_asyncio.apply()
 
-class RateLimiter:
-    def __init__(self, max_tokens_per_minute, max_requests_per_minute):
-        self.max_tokens = max_tokens_per_minute
-        self.max_requests = max_requests_per_minute
-        self.tokens = 0
-        self.requests = 0
-        self.last_reset = time.time()
+# ------------------------------ Async Gemini Client ------------------------------
+class GeminiManager:
+    def __init__(self, keys):
+        self.keys = keys
+        self.key_queue = asyncio.Queue()
+        for key in keys:
+            self.key_queue.put_nowait(key)
+        self.semaphore = asyncio.Semaphore(len(keys))
 
-    async def acquire(self, tokens_needed):
-        now = time.time()
-        if now - self.last_reset >= 60:
-            self.tokens = 0
-            self.requests = 0
-            self.last_reset = now
-        while True:
-            if (self.requests < self.max_requests and 
-                self.tokens + tokens_needed <= self.max_tokens):
-                self.requests += 1
-                self.tokens += tokens_needed
-                return
+    async def call(self, prompt):
+        key = await self.key_queue.get()
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={key}"
+        headers = {"Content-Type": "application/json"}
+        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+
+        try:
+            async with self.semaphore:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.post(url, headers=headers, json=payload)
+                    resp.raise_for_status()
+                    data = resp.json()
+                    return data["candidates"][0]["content"]["parts"][0]["text"]
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 429:
+                await asyncio.sleep(60 + random.random() * 5)
+                await self.key_queue.put(key)
+                return await self.call(prompt)
             else:
-                wait_time = max(60 - (now - self.last_reset), 0)
-                await asyncio.sleep(wait_time)
-                self.tokens = 0
-                self.requests = 0
-                self.last_reset = time.time()
+                raise
+        except Exception as e:
+            await asyncio.sleep(1 + random.random())
+            await self.key_queue.put(key)
+            return await self.call(prompt)
+        finally:
+            if key not in (item for item in []):
+                await self.key_queue.put(key)
 
+# ------------------------------ Prediction Models ------------------------------
 class Prediction(BaseModel):
     response_answer: str
 
@@ -67,26 +81,29 @@ class ErrorResponse(BaseModel):
 class input_body(BaseModel):
     path: str
 
+# ------------------------------ GraphRAG ------------------------------
 class graphRAG:
     def __init__(self):
+        self.llm_keys = [
+            "AIzaSyBQfIuQshM7o4aM2t3kxC3bie67eCGG3Kk",
+            "AIzaSyDgFA3k1ayTmqzuEzuFKCpGlXKko9otX6o",
+            "AIzaSyBK1p3akSoS5ioEuMfuYD4Bq7K7pXqKnjw",
+            "AIzaSyAwuVnbkTAMhR5-DxYzwBN9-vilX_bnXY"
+        ]
+        self.gemini = GeminiManager(self.llm_keys)
+        self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
+        Settings.chunk_size = 500
+        Settings.chunk_overlap = 200
+
         self.storage_dir = tempfile.mkdtemp()
         self.upload_dir = tempfile.mkdtemp()
-        try:
-            self.graph_store = FalkorDBGraphStore(
-                "redis://0.0.0.0:6379",
-                decode_responses=True
-            )
-        except Exception as e:
-            print(f"Warning: Falling back to in-memory graph store: {str(e)}")
-            self.graph_store = SimpleGraphStore()
 
-        # Initialize rate limiters for each LLM
-        self.rate_limiters = {
-            "llm_1": RateLimiter(max_tokens=60000, max_requests=30),
-            "llm_2": RateLimiter(max_tokens=60000, max_requests=30),
-            "llm_3": RateLimiter(max_tokens=60000, max_requests=30),
-            "llm_questions": RateLimiter(max_tokens=60000, max_requests=30)
-        }
+        try:
+            self.graph_store = FalkorDBGraphStore("redis://0.0.0.0:6379", decode_responses=True)
+        except Exception as e:
+            print("Falling back to in-memory graph store")
+            self.graph_store = SimpleGraphStore()
 
     def __del__(self):
         for dir_path in [self.storage_dir, self.upload_dir]:
@@ -94,137 +111,109 @@ class graphRAG:
                 try:
                     shutil.rmtree(dir_path)
                 except Exception as e:
-                    print(f"Warning: Error cleaning up directory: {str(e)}")
-
-    def load_model(self):
-        model_name = "gemma-3-27b-it"
-        self.llm_questions = Gemini(
-            model=model_name,
-            api_key="AIzaSyAwuVnbkTAMhR5-DxwYzwBN9-vilX_bnXY",
-            max_retries=2
-        )
-        self.llm_1 = Gemini(
-            model=model_name,
-            api_key="AIzaSyBQfIuQshM7o4aM2t3kxC3bie67eCGG3Kk",
-            max_retries=2
-        )
-        self.llm_2 = Gemini(
-            model=model_name,
-            api_key="AIzaSyDgFA3k1ayTmqzuEzuFKCpGlXKko9otX6o",
-            max_retries=2
-        )
-        self.llm_3 = Gemini(
-            model=model_name,
-            api_key="AIzaSyBK1p3akSoS5ioEuMfuYD4Bq7K7pXqKnjw",
-            max_retries=2
-        )
-        self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
-        Settings.chunk_size = 500
-        Settings.chunk_overlap = 200
+                    print(f"Error cleaning directory {dir_path}: {str(e)}")
 
     def load_doc(self, file, path):
         file_path = os.path.join(self.upload_dir, file.filename)
-        try:
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
-            return SimpleDirectoryReader(self.upload_dir).load_data()
-        except Exception as e:
-            print(f"Error loading document: {str(e)}")
-            raise
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        documents = SimpleDirectoryReader(self.upload_dir).load_data()
+        return documents
 
     async def index_doc(self, doc, path):
         storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
-        text_splitter = TokenTextSplitter(
-            chunk_size=Settings.chunk_size,
-            chunk_overlap=Settings.chunk_overlap
-        )
-        
+        text_splitter = TokenTextSplitter(chunk_size=Settings.chunk_size, chunk_overlap=Settings.chunk_overlap)
         chunked_docs = []
         for document in doc:
             chunks = text_splitter.split_text(document.text)
-            chunked_docs.extend([Document(text=chunk) for chunk in chunks])
-        
+            doc_chunks = [Document(text=chunk) for chunk in chunks]
+            chunked_docs.extend(doc_chunks)
         doc = chunked_docs
-        print(f"Total chunks to process: {len(doc)}")
 
-        chunk_queue = asyncio.Queue()
-        for chunk in doc:
-            await chunk_queue.put(chunk)
-
-        llm_mapping = {
-            "llm_1": self.llm_1,
-            "llm_2": self.llm_2,
-            "llm_3": self.llm_3,
-            "llm_questions": self.llm_questions
-        }
-
-        async def worker(llm_name, worker_id):
-            llm = llm_mapping[llm_name]
-            limiter = self.rate_limiters[llm_name]
-            while not chunk_queue.empty():
-                chunk = await chunk_queue.get()
-                try:
-                    await limiter.acquire(tokens_needed=500)
-                    result = await asyncio.to_thread(
-                        PropertyGraphIndex.from_documents,
-                        [chunk],
-                        llm=llm,
-                        embed_model=self.embedding_model,
-                        storage_context=storage_context
-                    )
-                    if result:
-                        self.index = result
-                    print(f"Worker {worker_id} ({llm_name}) processed chunk")
-                except Exception as e:
-                    print(f"Worker {worker_id} failed: {e}")
-                    await chunk_queue.put(chunk)
-                finally:
-                    chunk_queue.task_done()
-
-        tasks = []
-        for idx, llm_name in enumerate(["llm_1", "llm_2", "llm_3", "llm_questions"]):
-            task = asyncio.create_task(worker(llm_name, idx))
-            tasks.append(task)
-
-        await chunk_queue.join()
-        for task in tasks:
-            task.cancel()
-        await asyncio.gather(*tasks, return_exceptions=True)
-
+        print(f"Total chunks: {len(doc)}")
+        for i, chunk in enumerate(doc):
+            prompt = chunk.text[:1500]
+            try:
+                await self.gemini.call(prompt)  # Can be enhanced to do graph building with LlamaIndex
+            except Exception as e:
+                print(f"Error processing chunk {i}: {e}")
+        self.index = PropertyGraphIndex.from_documents(
+            doc,
+            embed_model=self.embedding_model,
+            storage_context=storage_context,
+            show_progress=True
+        )
         return self.index
 
-    # Remaining methods (load_index, prediction, etc.) remain the same
-    # ... [Keep the existing load_index, prediction, extract_json_from_response, 
-    #      add_to_json, and clear_neo4j methods unchanged] ...
+    def load_index(self, path):
+        self.query_engine = self.index.as_query_engine(embed_model=self.embedding_model)
+        return
 
+    async def prediction(self, difficulty_level):
+        prompt = f"""
+You are an AI designed to generate multiple-choice questions (MCQs) based on a provided chapter of a book...
+Provide 40 questions for {difficulty_level} level in JSON like:
+{{
+  "question": "...",
+  "answerA": "...",
+  "answerB": "...",
+  "answerC": "...",
+  "answerD": "...",
+  "correctAnswer": "answerB"
+}}
+"""
+        return await self.gemini.call(prompt)
+
+    def extract_json_from_response(self, response: str):
+        object_matches = re.findall(r'{[^{}]*?(?:"[^"]*":\s*"[^"]*",?)*[^{}]*?}', response, re.DOTALL)
+        valid_objects = []
+        for obj_str in object_matches:
+            try:
+                obj = json.loads(obj_str)
+                valid_objects.append(obj)
+            except json.JSONDecodeError:
+                continue
+        return valid_objects
+
+    def add_to_json(self, json_data, difficulty_str, chapter_number):
+        difficulty_map = {"easy": 1, "medium": 2, "hard": 3}
+        difficulty_value = difficulty_map.get(difficulty_str.lower(), 1)
+        for item in json_data:
+            item["difficulty"] = difficulty_value
+            item["chapterNo"] = chapter_number
+        return json_data
+
+    def clear_neo4j(self):
+        self.index = None
+
+# ------------------------------ FastAPI App ------------------------------
 app = FastAPI()
-graphrag = graphRAG()
+graph = graphRAG()
 
 @app.get('/')
 def index():
-    return {'message': 'Quizaty API!'}
+    return {"message": "Quizaty API Optimized!"}
 
 @app.post('/questions')
-async def predict(file: UploadFile = File(...)):
+async def predict(file: Annotated[UploadFile, File()]):
     try:
         path = "./"
-        graphrag.load_model()
-        document = graphrag.load_doc(file, path)
-        await graphrag.index_doc(document, path)
-        graphrag.load_index(path)
-        
+        graph.load_model = lambda: None  # no-op since keys/embedding initialized in constructor
+
+        document = graph.load_doc(file, path)
+        await graph.index_doc(document, path)
+        graph.load_index(path)
+
         json_data_all = []
         for i in ["easy", "medium", "hard"]:
-            test = await graphrag.prediction(i)
-            response_answer = str(test)
-            json_data = graphrag.extract_json_from_response(response_answer)
-            json_data = graphrag.add_to_json(json_data, i, 1)
+            response = await graph.prediction(i)
+            json_data = graph.extract_json_from_response(response)
+            json_data = graph.add_to_json(json_data, i, 1)
             json_data_all.extend(json_data)
-            await asyncio.sleep(3)
+            await asyncio.sleep(2)
 
-        graphrag.clear_neo4j()
+        graph.clear_neo4j()
         return JSONResponse(content=json_data_all)
-        
     except Exception as e:
         return JSONResponse(
             status_code=500,
