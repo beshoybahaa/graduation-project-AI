@@ -274,7 +274,7 @@ class QuizzatyAPI:
 
             # Run the graph
             try:
-                final_state = self.graph.run(state)
+                final_state = self.graph.invoke(state)
             except Exception as e:
                 error_msg = f"Graph execution error in process_document: {str(e)}\n{traceback.format_exc()}"
                 raise HTTPException(status_code=500, detail=error_msg)
