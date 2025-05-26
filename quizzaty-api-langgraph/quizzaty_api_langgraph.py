@@ -275,28 +275,33 @@ class QuizzatyAPI:
             # Run the graph
             try:
                 final_state = self.graph.invoke(state)
+                
+                # Check for errors in the final state
+                if isinstance(final_state, dict) and "error" in final_state:
+                    raise HTTPException(status_code=500, detail=final_state["error"])
+                
+                # Check if questions were generated
+                if not final_state.get("questions"):
+                    raise HTTPException(status_code=500, detail="No questions were generated in process_document")
+
+                # Add metadata to questions
+                try:
+                    questions = self._add_metadata_to_questions(
+                        final_state["questions"],
+                        difficulty,
+                        chapter_no
+                    )
+                except Exception as e:
+                    error_msg = f"Metadata addition error in process_document: {str(e)}\n{traceback.format_exc()}"
+                    raise HTTPException(status_code=500, detail=error_msg)
+
+                return questions
+
+            except HTTPException:
+                raise
             except Exception as e:
                 error_msg = f"Graph execution error in process_document: {str(e)}\n{traceback.format_exc()}"
                 raise HTTPException(status_code=500, detail=error_msg)
-
-            if final_state.error:
-                raise HTTPException(status_code=500, detail=final_state.error)
-
-            if not final_state.questions:
-                raise HTTPException(status_code=500, detail="No questions were generated in process_document")
-
-            # Add metadata to questions
-            try:
-                questions = self._add_metadata_to_questions(
-                    final_state.questions,
-                    difficulty,
-                    chapter_no
-                )
-            except Exception as e:
-                error_msg = f"Metadata addition error in process_document: {str(e)}\n{traceback.format_exc()}"
-                raise HTTPException(status_code=500, detail=error_msg)
-
-            return questions
 
         except HTTPException:
             raise
