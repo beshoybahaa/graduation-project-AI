@@ -13,11 +13,11 @@ import google.generativeai as genai
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FalkorDB
-from langchain.chains import GraphQAChain
 from langchain.graphs import FalkorGraph
+from langchain.chains import GraphQAChain
 from langchain.prompts import PromptTemplate
 from langchain.schema import Document
+from langchain_community.vectorstores import Redis
 import nest_asyncio
 
 # Apply nest_asyncio
@@ -47,8 +47,16 @@ class GraphRAG:
                 connection_string="redis://0.0.0.0:6379",
                 decode_responses=True
             )
+            
+            # Initialize Redis vector store
+            self.vector_store = Redis(
+                redis_url="redis://0.0.0.0:6379",
+                index_name="documents",
+                embedding=self.embedding_model,
+                decode_responses=True
+            )
         except Exception as e:
-            print(f"Warning: Could not connect to FalkorDB: {str(e)}")
+            print(f"Warning: Could not connect to FalkorDB/Redis: {str(e)}")
             raise
 
         # Initialize LLMs
@@ -119,6 +127,9 @@ class GraphRAG:
 
     async def process_chunk(self, chunk: Document, llm, chunk_index: int):
         try:
+            # Add document to vector store
+            self.vector_store.add_documents([chunk])
+            
             # Create a graph chain for this chunk
             chain = GraphQAChain.from_llm(
                 llm=llm,

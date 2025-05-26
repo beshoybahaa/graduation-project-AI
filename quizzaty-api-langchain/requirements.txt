@@ -9,4 +9,5 @@ google-generativeai==0.3.2
 sentence-transformers==2.5.1
 nest-asyncio==1.6.0
 redis==5.0.1
-falkordb==0.1.0 
+falkordb==0.1.0
+redis-py-cluster==2.1.3 
