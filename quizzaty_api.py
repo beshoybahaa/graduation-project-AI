@@ -24,6 +24,7 @@ from llama_index.llms.gemini import Gemini
 from llama_index.graph_stores.falkordb import FalkorDBGraphStore
 from llama_index.core.node_parser import TokenTextSplitter
 from llama_index.core import Settings
+from pydantic import SecretStr, SecretBytes  # Use these instead
 
 # Apply nest_asyncio
 nest_asyncio.apply()
@@ -204,7 +205,7 @@ def index():
     return {'message': 'Quizaty API!'}
 
 @app.post('/questions')
-async def predict(file: Annotated[UploadFile, File()]):
+async def predict(file: UploadFile = File(...)):
     try:
         path = "./"
         graphrag.load_model()
