@@ -42,7 +42,7 @@ class GraphRAG:
         self.upload_dir = tempfile.mkdtemp()
         
         # Neo4j connection settings
-        self.neo4j_url = os.getenv("NEO4J_URL", "bolt://0.0.0.0:7687")
+        self.neo4j_url = os.getenv("NEO4J_URL", "bolt://localhost:7687")
         self.neo4j_username = os.getenv("NEO4J_USERNAME", "neo4j")
         self.neo4j_password = os.getenv("NEO4J_PASSWORD", "password")
         
