@@ -41,11 +41,6 @@ class GraphRAG:
         self.storage_dir = tempfile.mkdtemp()
         self.upload_dir = tempfile.mkdtemp()
         
-        # Neo4j connection settings
-        self.neo4j_url = os.getenv("NEO4J_URL", "bolt://localhost:7687")
-        self.neo4j_username = os.getenv("NEO4J_USERNAME", "neo4j")
-        self.neo4j_password = os.getenv("NEO4J_PASSWORD", "password")
-        
         # Initialize embedding model first
         self.embedding_model = HuggingFaceEmbeddings(
             model_name="sentence-transformers/all-MiniLM-L6-v2"
@@ -54,11 +49,10 @@ class GraphRAG:
         # Initialize Neo4j connection
         try:
             print(f"Connecting to Neo4j at {self.neo4j_url}...")
-            self.graph = Neo4jGraph(
-                url=self.neo4j_url,
-                username=self.neo4j_username,
-                password=self.neo4j_password
-            )
+            self.graph = Neo4jGraph(url="bolt://localhost:7687", username="neo4j", password="password")
+
+
+
             print("Successfully connected to Neo4j graph database")
             
             # Initialize Neo4j vector store
