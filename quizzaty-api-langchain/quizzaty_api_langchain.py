@@ -66,7 +66,7 @@ class GraphRAG:
                 )
             except Exception as e:
                 print(f"Index does not exist, creating new one: {str(e)}")
-                self.vector_store = Neo4jVector.from_params(
+                self.vector_store = Neo4jVector(
                     embedding=self.embedding_model,
                     url="bolt://localhost:7687",
                     username="neo4j", 
