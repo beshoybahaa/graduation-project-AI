@@ -249,7 +249,11 @@ class GraphRAG:
             verbose=True
         )
 
-        response = await chain.arun(difficulty_level=difficulty_level)
+        # Add a query parameter to the chain.run call
+        response = await chain.arun(
+            query="Generate questions based on the document content",
+            difficulty_level=difficulty_level
+        )
         return self.extract_json_from_response(response)
 
     def extract_json_from_response(self, response: str) -> List[Dict]:
