@@ -42,7 +42,7 @@ class GraphRAG:
         self.upload_dir = tempfile.mkdtemp()
         
         # Neo4j connection settings
-        self.neo4j_url = os.getenv("NEO4J_URL", "bolt://localhost:7687")
+        self.neo4j_url = os.getenv("NEO4J_URL", "bolt://0.0.0.0:7687")
         self.neo4j_username = os.getenv("NEO4J_USERNAME", "neo4j")
         self.neo4j_password = os.getenv("NEO4J_PASSWORD", "password")
         
@@ -316,3 +316,5 @@ async def predict(file: Annotated[UploadFile, File()]):
             status_code=500,
             content={"error": "Unexpected Error", "step": "general", "details": str(e)}
         ) 
+    
+    #sudo docker run -d --name neo4j -p 7474:7474 -p 7687:7687 -e NEO4J_AUTH=neo4j/password neo4j:latest
