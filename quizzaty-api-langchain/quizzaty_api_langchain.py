@@ -48,7 +48,7 @@ class GraphRAG:
         
         # Initialize Neo4j connection
         try:
-            print(f"Connecting to Neo4j at {self.neo4j_url}...")
+            print(f"Connecting to Neo4j at \"bolt://localhost:7687\"...")
             self.graph = Neo4jGraph(url="bolt://localhost:7687", username="neo4j", password="password")
 
 
@@ -58,9 +58,9 @@ class GraphRAG:
             # Initialize Neo4j vector store
             self.vector_store = Neo4jVector.from_existing_index(
                 embedding=self.embedding_model,
-                url=self.neo4j_url,
-                username=self.neo4j_username,
-                password=self.neo4j_password,
+                url="bolt://localhost:7687",
+                username="neo4j",
+                password="password",
                 index_name="document_embeddings"
             )
             print("Successfully connected to Neo4j vector store")
