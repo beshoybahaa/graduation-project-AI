@@ -15,7 +15,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Neo4jVector
 from langchain.chains import GraphQAChain
-from langchain.graphs import Neo4jGraph
+from langchain_community.graphs import Neo4jGraph
 from langchain.prompts import PromptTemplate
 from langchain.schema import Document
 import nest_asyncio
@@ -41,24 +41,40 @@ class GraphRAG:
         self.storage_dir = tempfile.mkdtemp()
         self.upload_dir = tempfile.mkdtemp()
         
+        # Neo4j connection settings
+        self.neo4j_url = os.getenv("NEO4J_URL", "bolt://localhost:7687")
+        self.neo4j_username = os.getenv("NEO4J_USERNAME", "neo4j")
+        self.neo4j_password = os.getenv("NEO4J_PASSWORD", "password")
+        
+        # Initialize embedding model first
+        self.embedding_model = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2"
+        )
+        
         # Initialize Neo4j connection
         try:
+            print(f"Connecting to Neo4j at {self.neo4j_url}...")
             self.graph = Neo4jGraph(
-                url="bolt://localhost:7687",
-                username="neo4j",
-                password="password"  # Change this to your Neo4j password
+                url=self.neo4j_url,
+                username=self.neo4j_username,
+                password=self.neo4j_password
             )
+            print("Successfully connected to Neo4j graph database")
             
             # Initialize Neo4j vector store
             self.vector_store = Neo4jVector.from_existing_index(
                 embedding=self.embedding_model,
-                url="bolt://localhost:7687",
-                username="neo4j",
-                password="password",  # Change this to your Neo4j password
+                url=self.neo4j_url,
+                username=self.neo4j_username,
+                password=self.neo4j_password,
                 index_name="document_embeddings"
             )
+            print("Successfully connected to Neo4j vector store")
         except Exception as e:
-            print(f"Warning: Could not connect to Neo4j: {str(e)}")
+            print(f"Error connecting to Neo4j: {str(e)}")
+            print("Please ensure Neo4j is running and accessible")
+            print("You can start Neo4j using Docker with:")
+            print("docker run -d --name neo4j -p 7474:7474 -p 7687:7687 -e NEO4J_AUTH=neo4j/password neo4j:5.14.1")
             raise
 
         # Initialize LLMs
@@ -84,11 +100,6 @@ class GraphRAG:
                 max_retries=2
             )
         ]
-
-        # Initialize embedding model
-        self.embedding_model = HuggingFaceEmbeddings(
-            model_name="sentence-transformers/all-MiniLM-L6-v2"
-        )
 
         # Initialize text splitter
         self.text_splitter = RecursiveCharacterTextSplitter(
