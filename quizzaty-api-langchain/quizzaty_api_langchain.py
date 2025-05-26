@@ -19,6 +19,7 @@ from langchain_community.graphs import Neo4jGraph
 from langchain.prompts import PromptTemplate
 from langchain.schema import Document
 import nest_asyncio
+from PyPDF2 import PdfReader
 
 # Apply nest_asyncio
 nest_asyncio.apply()
@@ -128,9 +129,17 @@ class GraphRAG:
             with open(file_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
             
-            # Read the file content
-            with open(file_path, "r", encoding="utf-8") as f:
-                text = f.read()
+            # Check if file is PDF
+            if file.filename.lower().endswith('.pdf'):
+                # Read PDF file
+                pdf_reader = PdfReader(file_path)
+                text = ""
+                for page in pdf_reader.pages:
+                    text += page.extract_text() + "\n"
+            else:
+                # Read as text file
+                with open(file_path, "r", encoding="utf-8") as f:
+                    text = f.read()
             
             # Split text into chunks
             chunks = self.text_splitter.split_text(text)
