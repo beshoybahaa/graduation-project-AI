@@ -6,6 +6,7 @@ import re
 import shutil
 import tempfile
 from datetime import datetime
+import traceback
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
@@ -63,17 +64,21 @@ class QuizState(BaseModel):
 
 class QuizzatyAPI:
     def __init__(self):
-        self.storage_dir = tempfile.mkdtemp()
-        self.upload_dir = tempfile.mkdtemp()
-        self.llm_questions = None
-        self.llm_1 = None
-        self.llm_2 = None
-        self.llm_3 = None
-        self.embedding_model = None
-        self.graph_store = None
-        self._setup_graph_store()
-        self._setup_models()
-        self._setup_graph()
+        try:
+            self.storage_dir = tempfile.mkdtemp()
+            self.upload_dir = tempfile.mkdtemp()
+            self.llm_questions = None
+            self.llm_1 = None
+            self.llm_2 = None
+            self.llm_3 = None
+            self.embedding_model = None
+            self.graph_store = None
+            self._setup_graph_store()
+            self._setup_models()
+            self._setup_graph()
+        except Exception as e:
+            error_msg = f"Initialization error: {str(e)}\n{traceback.format_exc()}"
+            raise HTTPException(status_code=500, detail=error_msg)
 
     def _setup_graph_store(self):
         try:
@@ -82,38 +87,43 @@ class QuizzatyAPI:
                 decode_responses=True
             )
         except Exception as e:
-            print(f"Warning: Could not connect to FalkorDB: {str(e)}")
+            error_msg = f"Graph store setup error: {str(e)}\n{traceback.format_exc()}"
+            print(f"Warning: {error_msg}")
             print("Falling back to in-memory graph store")
             self.graph_store = SimpleGraphStore()
 
     def _setup_models(self):
-        # Initialize Gemini models
-        self.llm_questions = Gemini(
-            model="models/gemini-1.5-pro",
-            api_key="AIzaSyAwuVnbkTAMhR5-DxwYzwBN9-vilX_bnXY",
-            max_retries=2
-        )
-        self.llm_1 = Gemini(
-            model="models/gemini-1.5-pro",
-            api_key="AIzaSyBQfIuQshM7o4aM2t3kxC3bie67eCGG3Kk",
-            max_retries=2
-        )
-        self.llm_2 = Gemini(
-            model="models/gemini-1.5-pro",
-            api_key="AIzaSyDgFA3k1ayTmqzuEzuFKCpGlXKko9otX6o",
-            max_retries=2
-        )
-        self.llm_3 = Gemini(
-            model="models/gemini-1.5-pro",
-            api_key="AIzaSyBK1p3akSoS5ioEuMfuYD4Bq7K7pXqKnjw",
-            max_retries=2
-        )
-        self.embedding_model = HuggingFaceEmbedding(
-            model_name="sentence-transformers/all-MiniLM-L6-v2"
-        )
+        try:
+            # Initialize Gemini models
+            self.llm_questions = Gemini(
+                model="models/gemini-1.5-pro",
+                api_key="AIzaSyAwuVnbkTAMhR5-DxwYzwBN9-vilX_bnXY",
+                max_retries=2
+            )
+            self.llm_1 = Gemini(
+                model="models/gemini-1.5-pro",
+                api_key="AIzaSyBQfIuQshM7o4aM2t3kxC3bie67eCGG3Kk",
+                max_retries=2
+            )
+            self.llm_2 = Gemini(
+                model="models/gemini-1.5-pro",
+                api_key="AIzaSyDgFA3k1ayTmqzuEzuFKCpGlXKko9otX6o",
+                max_retries=2
+            )
+            self.llm_3 = Gemini(
+                model="models/gemini-1.5-pro",
+                api_key="AIzaSyBK1p3akSoS5ioEuMfuYD4Bq7K7pXqKnjw",
+                max_retries=2
+            )
+            self.embedding_model = HuggingFaceEmbedding(
+                model_name="sentence-transformers/all-MiniLM-L6-v2"
+            )
 
-        Settings.chunk_size = 500
-        Settings.chunk_overlap = 200
+            Settings.chunk_size = 500
+            Settings.chunk_overlap = 200
+        except Exception as e:
+            error_msg = f"Model setup error: {str(e)}\n{traceback.format_exc()}"
+            raise HTTPException(status_code=500, detail=error_msg)
 
     def _setup_graph(self):
         # Define the nodes
@@ -123,12 +133,13 @@ class QuizzatyAPI:
                 state.documents = documents
                 return state
             except Exception as e:
-                state.error = f"Document loading error: {str(e)}"
+                error_msg = f"Document loading error in load_document: {str(e)}\n{traceback.format_exc()}"
+                state.error = error_msg
                 return state
 
         def process_document(state: QuizState) -> QuizState:
             if not state.documents:
-                state.error = "No documents to process"
+                state.error = "No documents to process in process_document"
                 return state
 
             try:
@@ -147,12 +158,13 @@ class QuizzatyAPI:
                 state.documents = chunked_docs
                 return state
             except Exception as e:
-                state.error = f"Document processing error: {str(e)}"
+                error_msg = f"Document processing error in process_document: {str(e)}\n{traceback.format_exc()}"
+                state.error = error_msg
                 return state
 
         def create_index(state: QuizState) -> QuizState:
             if not state.documents:
-                state.error = "No documents to index"
+                state.error = "No documents to index in create_index"
                 return state
 
             try:
@@ -165,12 +177,13 @@ class QuizzatyAPI:
                 )
                 return state
             except Exception as e:
-                state.error = f"Index creation error: {str(e)}"
+                error_msg = f"Index creation error in create_index: {str(e)}\n{traceback.format_exc()}"
+                state.error = error_msg
                 return state
 
         def generate_questions(state: QuizState) -> QuizState:
             if not state.index:
-                state.error = "No index available for question generation"
+                state.error = "No index available for question generation in generate_questions"
                 return state
 
             try:
@@ -193,10 +206,14 @@ class QuizzatyAPI:
 
                 response = query_engine.query(prompt)
                 questions = self._extract_json_from_response(str(response))
+                if not questions:
+                    state.error = "No valid questions were extracted from the response in generate_questions"
+                    return state
                 state.questions = questions
                 return state
             except Exception as e:
-                state.error = f"Question generation error: {str(e)}"
+                error_msg = f"Question generation error in generate_questions: {str(e)}\n{traceback.format_exc()}"
+                state.error = error_msg
                 return state
 
         # Create the graph
@@ -245,32 +262,47 @@ class QuizzatyAPI:
         try:
             # Save uploaded file
             file_path = os.path.join(self.upload_dir, file.filename)
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
+            try:
+                with open(file_path, "wb") as buffer:
+                    shutil.copyfileobj(file.file, buffer)
+            except Exception as e:
+                error_msg = f"File saving error in process_document: {str(e)}\n{traceback.format_exc()}"
+                raise HTTPException(status_code=500, detail=error_msg)
 
             # Initialize state
             state = QuizState(current_difficulty=difficulty)
 
             # Run the graph
-            final_state = self.graph.run(state)
+            try:
+                final_state = self.graph.run(state)
+            except Exception as e:
+                error_msg = f"Graph execution error in process_document: {str(e)}\n{traceback.format_exc()}"
+                raise HTTPException(status_code=500, detail=error_msg)
 
             if final_state.error:
                 raise HTTPException(status_code=500, detail=final_state.error)
 
             if not final_state.questions:
-                raise HTTPException(status_code=500, detail="No questions were generated")
+                raise HTTPException(status_code=500, detail="No questions were generated in process_document")
 
             # Add metadata to questions
-            questions = self._add_metadata_to_questions(
-                final_state.questions,
-                difficulty,
-                chapter_no
-            )
+            try:
+                questions = self._add_metadata_to_questions(
+                    final_state.questions,
+                    difficulty,
+                    chapter_no
+                )
+            except Exception as e:
+                error_msg = f"Metadata addition error in process_document: {str(e)}\n{traceback.format_exc()}"
+                raise HTTPException(status_code=500, detail=error_msg)
 
             return questions
 
+        except HTTPException:
+            raise
         except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+            error_msg = f"Unexpected error in process_document: {str(e)}\n{traceback.format_exc()}"
+            raise HTTPException(status_code=500, detail=error_msg)
 
     def __del__(self):
         for dir_path in [self.storage_dir, self.upload_dir]:
