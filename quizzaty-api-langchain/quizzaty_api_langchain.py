@@ -21,6 +21,7 @@ from langchain.prompts import PromptTemplate
 from langchain.schema import Document
 import nest_asyncio
 from PyPDF2 import PdfReader
+import networkx as nx
 
 # Apply nest_asyncio
 nest_asyncio.apply()
@@ -157,8 +158,8 @@ class GraphRAG:
             # Add document to vector store
             self.vector_store.add_documents([chunk])
             
-            # Convert Neo4j graph to Networkx graph
-            networkx_graph = NetworkxEntityGraph.from_neo4j(self.graph)
+            # Create a new Networkx graph
+            networkx_graph = NetworkxEntityGraph()
             
             # Create a graph chain for this chunk
             chain = GraphQAChain.from_llm(
