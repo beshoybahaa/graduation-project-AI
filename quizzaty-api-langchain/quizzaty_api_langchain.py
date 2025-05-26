@@ -56,13 +56,23 @@ class GraphRAG:
             print("Successfully connected to Neo4j graph database")
             
             # Initialize Neo4j vector store
-            self.vector_store = Neo4jVector.from_existing_index(
-                embedding=self.embedding_model,
-                url="bolt://localhost:7687",
-                username="neo4j",
-                password="password",
-                index_name="document_embeddings"
-            )
+            try:
+                self.vector_store = Neo4jVector.from_existing_index(
+                    embedding=self.embedding_model,
+                    url="bolt://localhost:7687",
+                    username="neo4j",
+                    password="password",
+                    index_name="document_embeddings"
+                )
+            except Exception as e:
+                print(f"Index does not exist, creating new one: {str(e)}")
+                self.vector_store = Neo4jVector.from_params(
+                    embedding=self.embedding_model,
+                    url="bolt://localhost:7687",
+                    username="neo4j", 
+                    password="password",
+                    index_name="document_embeddings"
+                )
             print("Successfully connected to Neo4j vector store")
         except Exception as e:
             print(f"Error connecting to Neo4j: {str(e)}")
