@@ -177,7 +177,7 @@ class GraphRAG:
 
     async def index_doc(self, documents: List[Document]):
         start_time = time.time()
-        chunks_per_batch = 25
+        chunks_per_batch = 4
         total_chunks = len(documents)
         total_batches = (total_chunks + chunks_per_batch - 1) // chunks_per_batch
 
