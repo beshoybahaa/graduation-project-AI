@@ -16,6 +16,7 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Neo4jVector
 from langchain.chains import GraphQAChain
 from langchain_community.graphs import Neo4jGraph
+from langchain.graphs import NetworkxEntityGraph
 from langchain.prompts import PromptTemplate
 from langchain.schema import Document
 import nest_asyncio
@@ -156,10 +157,13 @@ class GraphRAG:
             # Add document to vector store
             self.vector_store.add_documents([chunk])
             
+            # Convert Neo4j graph to Networkx graph
+            networkx_graph = NetworkxEntityGraph.from_neo4j(self.graph)
+            
             # Create a graph chain for this chunk
             chain = GraphQAChain.from_llm(
                 llm=llm,
-                graph=self.graph,
+                graph=networkx_graph,
                 verbose=True
             )
             
