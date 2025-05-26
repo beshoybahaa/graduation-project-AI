@@ -62,6 +62,33 @@ class QuizState(BaseModel):
     error: Optional[str] = None
     current_difficulty: Optional[str] = None
 
+    def get(self, key: str, default=None):
+        return getattr(self, key, default)
+
+    def __getitem__(self, key: str):
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value: Any):
+        setattr(self, key, value)
+
+    def update(self, data: dict):
+        for key, value in data.items():
+            setattr(self, key, value)
+        return self
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'QuizState':
+        return cls(**data)
+
+    def to_dict(self) -> dict:
+        return {
+            "documents": self.documents,
+            "index": self.index,
+            "questions": self.questions,
+            "error": self.error,
+            "current_difficulty": self.current_difficulty
+        }
+
 class QuizzatyAPI:
     def __init__(self):
         try:
@@ -130,14 +157,14 @@ class QuizzatyAPI:
         def load_document(state: QuizState) -> QuizState:
             try:
                 documents = SimpleDirectoryReader(self.upload_dir).load_data()
-                return {"documents": documents}
+                return QuizState(documents=documents)
             except Exception as e:
                 error_msg = f"Document loading error in load_document: {str(e)}\n{traceback.format_exc()}"
-                return {"error": error_msg}
+                return QuizState(error=error_msg)
 
-        def process_document(state: dict) -> dict:
-            if not state.get("documents"):
-                return {"error": "No documents to process in process_document"}
+        def process_document(state: QuizState) -> QuizState:
+            if not state.documents:
+                return QuizState(error="No documents to process in process_document")
 
             try:
                 storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
@@ -147,44 +174,44 @@ class QuizzatyAPI:
                 )
 
                 chunked_docs = []
-                for document in state["documents"]:
+                for document in state.documents:
                     chunks = text_splitter.split_text(document.text)
                     doc_chunks = [Document(text=chunk) for chunk in chunks]
                     chunked_docs.extend(doc_chunks)
 
-                return {"documents": chunked_docs}
+                return QuizState(documents=chunked_docs)
             except Exception as e:
                 error_msg = f"Document processing error in process_document: {str(e)}\n{traceback.format_exc()}"
-                return {"error": error_msg}
+                return QuizState(error=error_msg)
 
-        def create_index(state: dict) -> dict:
-            if not state.get("documents"):
-                return {"error": "No documents to index in create_index"}
+        def create_index(state: QuizState) -> QuizState:
+            if not state.documents:
+                return QuizState(error="No documents to index in create_index")
 
             try:
                 storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
                 index = PropertyGraphIndex.from_documents(
-                    state["documents"],
+                    state.documents,
                     llm=self.llm_questions,
                     embed_model=self.embedding_model,
                     storage_context=storage_context
                 )
-                return {"index": index}
+                return QuizState(index=index)
             except Exception as e:
                 error_msg = f"Index creation error in create_index: {str(e)}\n{traceback.format_exc()}"
-                return {"error": error_msg}
+                return QuizState(error=error_msg)
 
-        def generate_questions(state: dict) -> dict:
-            if not state.get("index"):
-                return {"error": "No index available for question generation in generate_questions"}
+        def generate_questions(state: QuizState) -> QuizState:
+            if not state.index:
+                return QuizState(error="No index available for question generation in generate_questions")
 
             try:
-                query_engine = state["index"].as_query_engine(
+                query_engine = state.index.as_query_engine(
                     llm=self.llm_questions,
                     embed_model=self.embedding_model
                 )
 
-                prompt = f"""Generate multiple-choice questions for {state.get('current_difficulty', 'medium')} level.
+                prompt = f"""Generate multiple-choice questions for {state.current_difficulty or 'medium'} level.
                 Format each question as a JSON object with the following structure:
                 {{
                     "question": "Question text",
@@ -199,11 +226,11 @@ class QuizzatyAPI:
                 response = query_engine.query(prompt)
                 questions = self._extract_json_from_response(str(response))
                 if not questions:
-                    return {"error": "No valid questions were extracted from the response in generate_questions"}
-                return {"questions": questions}
+                    return QuizState(error="No valid questions were extracted from the response in generate_questions")
+                return QuizState(questions=questions)
             except Exception as e:
                 error_msg = f"Question generation error in generate_questions: {str(e)}\n{traceback.format_exc()}"
-                return {"error": error_msg}
+                return QuizState(error=error_msg)
 
         # Create the graph
         workflow = StateGraph(QuizState)
@@ -259,24 +286,24 @@ class QuizzatyAPI:
                 raise HTTPException(status_code=500, detail=error_msg)
 
             # Initialize state
-            initial_state = {"current_difficulty": difficulty}
+            initial_state = QuizState(current_difficulty=difficulty)
 
             # Run the graph
             try:
                 final_state = self.graph.invoke(initial_state)
                 
                 # Check for errors in the final state
-                if "error" in final_state:
-                    raise HTTPException(status_code=500, detail=final_state["error"])
+                if final_state.error:
+                    raise HTTPException(status_code=500, detail=final_state.error)
                 
                 # Check if questions were generated
-                if not final_state.get("questions"):
+                if not final_state.questions:
                     raise HTTPException(status_code=500, detail="No questions were generated in process_document")
 
                 # Add metadata to questions
                 try:
                     questions = self._add_metadata_to_questions(
-                        final_state["questions"],
+                        final_state.questions,
                         difficulty,
                         chapter_no
                     )
