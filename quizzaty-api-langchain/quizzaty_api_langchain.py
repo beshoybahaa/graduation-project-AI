@@ -238,10 +238,13 @@ class GraphRAG:
             input_variables=["difficulty_level"]
         )
 
+        # Create a new Networkx graph
+        networkx_graph = NetworkxEntityGraph()
+
         # Use the first LLM for question generation
         chain = GraphQAChain.from_llm(
             llm=self.llms[0],
-            graph=self.graph,
+            graph=networkx_graph,
             prompt=prompt,
             verbose=True
         )
