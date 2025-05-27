@@ -255,7 +255,7 @@ class graphRAG:
                     storage_context=storage_context,
                     use_async=True,
                     num_workers=3,
-                    show_progress=True
+                    # show_progress=True
                 )
                 
                 chunk_end = time.time()
