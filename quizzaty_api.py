@@ -207,13 +207,17 @@ class graphRAG:
             chunk_start = time.time()
             try:
                 print(f"\n{llm_name} starting to process chunk {chunk_index}")
-                result = await asyncio.to_thread(
-                    PropertyGraphIndex.from_documents,
-                    [chunk],
-                    llm=llm,
-                    embed_model=self.embedding_model,
-                    storage_context=storage_context,
-                    use_async=True
+                # Create a new event loop for this chunk if needed
+                loop = asyncio.get_event_loop()
+                result = await loop.create_task(
+                    asyncio.to_thread(
+                        PropertyGraphIndex.from_documents,
+                        [chunk],
+                        llm=llm,
+                        embed_model=self.embedding_model,
+                        storage_context=storage_context,
+                        use_async=True
+                    )
                 )
                 chunk_end = time.time()
                 processing_time = chunk_end - chunk_start
@@ -280,7 +284,7 @@ class graphRAG:
             # Sleep between rounds if there are more batches to process
             if batch_start + len(llms) < total_batches:
                 print("\nSleeping for 30 seconds before next round...")
-                await asyncio.sleep(30)
+                await asyncio.sleep(60)
         
         # End timer and calculate duration
         end_time = time.time()
