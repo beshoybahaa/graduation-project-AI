@@ -240,6 +240,7 @@ class graphRAG:
         # Dictionary to track processing times for each LLM
         llm_processing_times = {name: [] for _, name in llms}
         llm_chunk_counts = {name: 0 for _, name in llms}
+        llm_request_counts = {name: 0 for _, name in llms}  # New dictionary to track requests
         
         async def process_chunk(chunk, llm_tuple, chunk_index):
             llm, llm_name = llm_tuple
@@ -261,7 +262,8 @@ class graphRAG:
                 processing_time = chunk_end - chunk_start
                 llm_processing_times[llm_name].append(processing_time)
                 llm_chunk_counts[llm_name] += 1
-                print(f"{llm_name} completed chunk {chunk_index} in {processing_time:.2f} seconds")
+                llm_request_counts[llm_name] += 1  # Increment request count
+                print(f"{llm_name} completed chunk {chunk_index} in {processing_time:.2f} seconds (Total requests: {llm_request_counts[llm_name]})")
                 return result
             except Exception as e:
                 chunk_end = time.time()
@@ -322,7 +324,7 @@ class graphRAG:
             print("\nRound Summary:")
             for i, duration in enumerate(batch_durations):
                 llm_name = llms[i][1]
-                print(f"{llm_name} processed batch {batch_start + i} in {duration:.2f} seconds")
+                print(f"{llm_name} processed batch {batch_start + i} in {duration:.2f} seconds (Total requests: {llm_request_counts[llm_name]})")
             
             # Sleep between rounds if there are more batches to process
             if batch_start + len(llms) < total_batches:
@@ -343,6 +345,7 @@ class graphRAG:
                 avg_time = total_time / len(llm_processing_times[llm_name])
                 print(f"{llm_name}:")
                 print(f"  - Total chunks processed: {llm_chunk_counts[llm_name]}")
+                print(f"  - Total requests made: {llm_request_counts[llm_name]}")
                 print(f"  - Total processing time: {total_time:.2f} seconds")
                 print(f"  - Average time per chunk: {avg_time:.2f} seconds")
         
