@@ -206,7 +206,7 @@ class graphRAG:
                     embed_model=self.embedding_model,
                     storage_context=storage_context,
                     num_workers=2,  # Reduced number of workers
-                    # chunk_sleep_time=5.0,
+                    chunk_sleep_time=5.0,
                     show_progress=True
 
                 )
