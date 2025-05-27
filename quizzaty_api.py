@@ -28,7 +28,7 @@ from llama_index.core.async_utils import asyncio_run
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.gemini import Gemini
 from llama_index.llms.groq import Groq
-from llama_index.llms.together import Together_AI
+from llama_index.llms.together import TogetherLLM
 from llama_index.graph_stores.falkordb import FalkorDBGraphStore
 from llama_index.core.node_parser import TokenTextSplitter
 
@@ -117,7 +117,7 @@ class graphRAG:
             api_key="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",
             max_retries=2
         )
-        self.llm_together = Together_AI(
+        self.llm_together = TogetherLLM(
             model="meta-llama/Llama-3.3-70B-Instruct-Turbo-Free",
             api_key="tgp_v1_l2VKQAmfsfOF3R6jht38IvlWFwZ7bzEkqm2GVfjUL14",
             max_retries=2
