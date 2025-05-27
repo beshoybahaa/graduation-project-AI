@@ -27,7 +27,7 @@ from llama_index.core.graph_stores import SimpleGraphStore
 from llama_index.core.async_utils import asyncio_run
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.gemini import Gemini
-from llama_index.llms.grok import Grok
+from llama_index.llms.groq import Groq
 from llama_index.llms.together import Together_AI
 from llama_index.graph_stores.falkordb import FalkorDBGraphStore
 from llama_index.core.node_parser import TokenTextSplitter
@@ -112,7 +112,7 @@ class graphRAG:
             api_key="AIzaSyAwuVnbkTAMhR5-DxwYzwBN9-vilX_bnXY",
             max_retries=2
         )
-        self.llm_groq = Grok(
+        self.llm_groq = Groq(
             model="gemma2-9b-it",
             api_key="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",
             max_retries=2
