@@ -306,7 +306,10 @@ class graphRAG:
         total_batches = (len(doc) + chunks_per_batch - 1) // chunks_per_batch
         
         # Process batches in parallel, with each LLM handling its own batch
+        round_counter = 0
         for batch_start in range(0, total_batches, len(llms)):
+            round_counter += 1
+            round_requests = {llm_name: 0 for _, llm_name in llms}  # Track requests for this round
             batch_tasks = []
             for i, llm_tuple in enumerate(llms):
                 batch_number = batch_start + i
@@ -323,10 +326,12 @@ class graphRAG:
             batch_durations = await asyncio.gather(*batch_tasks)
             
             # Print round summary
-            print("\nRound Summary:")
+            print(f"\nRound {round_counter} Summary:")
             for i, duration in enumerate(batch_durations):
                 llm_name = llms[i][1]
-                print(f"{llm_name} processed batch {batch_start + i} in {duration:.2f} seconds (Total requests: {llm_request_counts[llm_name]})")
+                # Calculate requests for this round
+                round_requests[llm_name] = llm_request_counts[llm_name] - sum(round_requests.values())
+                print(f"{llm_name} processed batch {batch_start + i} in {duration:.2f} seconds (Round requests: {round_requests[llm_name]}, Total requests: {llm_request_counts[llm_name]})")
             
             # Sleep between rounds if there are more batches to process
             if batch_start + len(llms) < total_batches:
