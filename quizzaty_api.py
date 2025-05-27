@@ -255,6 +255,7 @@ class graphRAG:
                     storage_context=storage_context,
                     use_async=True,
                     num_workers=1,
+                    chunk_sleep_time=10.0
                     # show_progress=True
                 )
                 
