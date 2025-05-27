@@ -231,7 +231,7 @@ class graphRAG:
         # Create a list of LLMs to use with their names
         llms = [
             (self.llm_groq, "groq"),
-            (self.llm_together, "together"),
+            # (self.llm_together, "together"),
             (self.llm_gemini, "gemini"),
         ]
         
