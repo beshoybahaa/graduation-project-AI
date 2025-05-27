@@ -106,6 +106,7 @@ class graphRAG:
         # Configure Gemini with API key from environment variable or fallback to hardcoded key
         # api_key = os.getenv("GOOGLE_API_KEY", "AIzaSyCnhkm10JspaX-SPOw8eCtDeYsu8l52fiA")
         # genai.configure(api_key="AIzaSyCnhkm10JspaX-SPOw8eCtDeYsu8l52fiA")
+
         model_name = "gemma-3-27b-it"
         self.llm_questions = Gemini(
             model=model_name,
@@ -127,6 +128,38 @@ class graphRAG:
             api_key="AIzaSyBK1p3akSoS5ioEuMfuYD4Bq7K7pXqKnjw",
             max_retries=2
         )
+        self.llm_4 = Gemini(
+            model=model_name,
+            api_key="AIzaSyB09dUhjrfIJ7QPrsnV585S5b9z1KkuwS4",
+            max_retries=2
+        )
+        self.llm_5 = Gemini(
+            model=model_name,
+            api_key="AIzaSyAhoR1sPdMlRUwoKmD5jp4UUx131KKamKU",
+            max_retries=2
+        )
+        self.llm_6 = Gemini(
+            model=model_name,
+            api_key="AIzaSyDmEd3JRN6qv_0jfm4cHg5wHVrpAFiJYqE",
+            max_retries=2
+        )
+        self.llm_7 = Gemini(
+            model=model_name,
+            api_key="AIzaSyBtarGCXK7q_1PnZ3DBmzfyn-8EpCgl_VM",
+            max_retries=2
+        )
+        self.llm_8 = Gemini(
+            model=model_name,
+            api_key="AIzaSyCoK5ND4racg4JpTcBgNUT_r9J2-clzjNA",
+            max_retries=2
+        )
+        self.llm_9 = Gemini(
+            model=model_name,
+            api_key="AIzaSyBqGHbJr8e5MDG6cKmwQJw_xMydXxBQMXU",
+            max_retries=2
+        )
+
+
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
         Settings.chunk_size = 500
