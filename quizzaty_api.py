@@ -253,7 +253,7 @@ class graphRAG:
                     embed_model=self.embedding_model,
                     storage_context=storage_context,
                     use_async=True,
-                    show_progress=True
+                    # show_progress=True
                 )
                 
                 chunk_end = time.time()
