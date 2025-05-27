@@ -310,12 +310,18 @@ class graphRAG:
 
     # load the index
     def load_index(self, path):
-        self.query_engine = self.index.as_query_engine(
-            llm=self.llm_questions,
-            embed_model=self.embedding_model,
-            storage_context=self.index.storage_context
-        )
-        return
+        try:
+            # Create query engine for PropertyGraphIndex
+            self.query_engine = self.index.as_query_engine(
+                llm=self.llm_questions,
+                storage_context=self.index.storage_context,
+                include_text=True,  # Include the text in the response
+                response_mode="tree_summarize"  # Use tree summarization for better responses
+            )
+            return
+        except Exception as e:
+            print(f"Error in load_index: {str(e)}")
+            raise
         
     # prediction
     async def prediction(self, difficulty_level):
