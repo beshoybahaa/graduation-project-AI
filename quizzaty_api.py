@@ -207,17 +207,13 @@ class graphRAG:
             chunk_start = time.time()
             try:
                 print(f"\n{llm_name} starting to process chunk {chunk_index}")
-                # Create a new event loop for this chunk if needed
-                loop = asyncio.get_event_loop()
-                result = await loop.create_task(
-                    asyncio.to_thread(
-                        PropertyGraphIndex.from_documents,
-                        [chunk],
-                        llm=llm,
-                        embed_model=self.embedding_model,
-                        storage_context=storage_context,
-                        use_async=True
-                    )
+                # Create PropertyGraphIndex asynchronously
+                result = await PropertyGraphIndex.from_documents(
+                    [chunk],
+                    llm=llm,
+                    embed_model=self.embedding_model,
+                    storage_context=storage_context,
+                    use_async=True
                 )
                 chunk_end = time.time()
                 processing_time = chunk_end - chunk_start
@@ -237,15 +233,20 @@ class graphRAG:
             batch_start = time.time()
             print(f"\n{llm_name} starting batch {batch_number} with {len(batch_chunks)} chunks")
             
+            # Process chunks concurrently using asyncio.gather
             tasks = []
             for j, chunk in enumerate(batch_chunks):
                 chunk_index = (batch_number * len(batch_chunks)) + j
                 tasks.append(process_chunk(chunk, llm_tuple, chunk_index))
             
-            results = await asyncio.gather(*tasks)
+            # Wait for all chunks in the batch to complete
+            results = await asyncio.gather(*tasks, return_exceptions=True)
             
             # Update index with the last successful result
             for result in results:
+                if isinstance(result, Exception):
+                    print(f"Error in batch processing: {str(result)}")
+                    continue
                 if result is not None:
                     self.index = result
             
