@@ -257,7 +257,7 @@ class graphRAG:
                     storage_context=storage_context,
                     use_async=True,
                     num_workers=1,  # Reduced number of workers
-                    # show_progress=True
+                    show_progress=True
                 )
                 
                 chunk_end = time.time()
@@ -305,7 +305,7 @@ class graphRAG:
             return batch_duration
 
         # Calculate chunks per batch
-        chunks_per_batch = 10  # Reduced batch size
+        chunks_per_batch = 25  # Reduced batch size
         total_batches = (len(doc) + chunks_per_batch - 1) // chunks_per_batch
         
         # Process batches in parallel, with each LLM handling its own batch
