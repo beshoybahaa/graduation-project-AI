@@ -113,7 +113,7 @@ class graphRAG:
             max_retries=2
         )
         self.llm_groq = Groq(
-            model="llama-guard-3-8b",
+            model="llama3-70b-8192",
             api_key="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",
             max_retries=2
         )
