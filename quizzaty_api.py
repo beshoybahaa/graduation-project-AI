@@ -212,7 +212,8 @@ class graphRAG:
                     [chunk],
                     llm=llm,
                     embed_model=self.embedding_model,
-                    storage_context=storage_context
+                    storage_context=storage_context,
+                    use_async=True
                 )
                 chunk_end = time.time()
                 processing_time = chunk_end - chunk_start
@@ -250,7 +251,7 @@ class graphRAG:
             return batch_duration
 
         # Calculate chunks per batch
-        chunks_per_batch = 50
+        chunks_per_batch = 10
         total_batches = (len(doc) + chunks_per_batch - 1) // chunks_per_batch
         
         # Process batches in parallel, with each LLM handling its own batch
