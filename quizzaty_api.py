@@ -325,8 +325,8 @@ class graphRAG:
             
             # Sleep between rounds if there are more batches to process
             if batch_start + len(llms) < total_batches:
-                print("\nSleeping for 30 seconds before next round...")
-                await asyncio.sleep(30)  # Reduced sleep time for better performance
+                print("\nSleeping for 60 seconds before next round...")
+                await asyncio.sleep(60)  # Reduced sleep time for better performance
         
         # End timer and calculate duration
         end_time = time.time()
