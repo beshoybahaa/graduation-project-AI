@@ -107,7 +107,7 @@ class graphRAG:
         # api_key = os.getenv("GOOGLE_API_KEY", "AIzaSyCnhkm10JspaX-SPOw8eCtDeYsu8l52fiA")
         # genai.configure(api_key="AIzaSyCnhkm10JspaX-SPOw8eCtDeYsu8l52fiA")
 
-        model_name = "gemini-2.0-flash"
+        model_name = "gemini-2.0-flash-lite"
         self.llm_questions = Gemini(
             model=model_name,
             api_key="AIzaSyAwuVnbkTAMhR5-DxwYzwBN9-vilX_bnXY",
