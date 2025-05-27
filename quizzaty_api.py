@@ -108,7 +108,7 @@ class graphRAG:
         # Configure Gemini with API key from environment variable or fallback to hardcoded key
 
         self.llm_gemini = Gemini(
-            model="gemini-1.5-flash",
+            model="Gemma-3",
             api_key="AIzaSyAwuVnbkTAMhR5-DxwYzwBN9-vilX_bnXY",
             max_retries=2
         )
