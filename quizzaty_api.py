@@ -228,6 +228,12 @@ class graphRAG:
             (self.llm_1, "LLM_1"),
             (self.llm_2, "LLM_2"),
             (self.llm_3, "LLM_3"),
+            (self.llm_4, "LLM_4"),
+            (self.llm_5, "LLM_5"),
+            (self.llm_6, "LLM_6"),
+            (self.llm_7, "LLM_7"),
+            (self.llm_8, "LLM_8"),
+            (self.llm_9, "LLM_9"),
             (self.llm_questions, "LLM_Questions")
         ]
         
