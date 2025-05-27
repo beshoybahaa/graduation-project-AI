@@ -265,6 +265,20 @@ class GraphRAG:
                 "correctAnswer": "answerX"  // where X is A, B, C, or D
             }}
 
+            IMPORTANT: Your response must be a valid JSON array containing these question objects.
+            Example response format:
+            [
+                {{
+                    "question": "What is the main concept?",
+                    "answerA": "Option A",
+                    "answerB": "Option B",
+                    "answerC": "Option C",
+                    "answerD": "Option D",
+                    "correctAnswer": "answerA"
+                }},
+                // ... more questions ...
+            ]
+
             Use the knowledge graph to ensure questions are based on actual content from the document."""
 
         prompt = PromptTemplate(
@@ -284,11 +298,14 @@ class GraphRAG:
         )
 
         # First, get the graph data from Neo4j
+        print("Fetching graph data from Neo4j...")
         graph_data = self.graph.query("""
             MATCH (n:Entity)
             OPTIONAL MATCH (n)-[r:RELATES_TO]->(m:Entity)
             RETURN n, r, m
         """)
+        
+        print(f"Retrieved {len(graph_data)} records from Neo4j")
         
         # Add the data to the Networkx graph
         for record in graph_data:
@@ -302,29 +319,51 @@ class GraphRAG:
         nodes = list(networkx_graph._graph.nodes())
         edges = list(networkx_graph._graph.edges())
         print(f"Loaded graph with {len(nodes)} nodes and {len(edges)} edges")
+        
+        if len(nodes) == 0:
+            print("Warning: No nodes found in the graph. This might affect question generation.")
+            return []
 
         # Generate questions using the populated graph
+        print(f"Generating questions for {difficulty_level} difficulty...")
         response = await chain.arun(
             query="Generate questions based on the relationships and concepts in the knowledge graph",
             difficulty_level=difficulty_level
         )
         
+        print(f"Raw response from LLM: {response[:500]}...")  # Print first 500 chars of response
+        
         questions = self.extract_json_from_response(response)
         print(f"Generated {len(questions)} questions for {difficulty_level} difficulty")
+        
+        if len(questions) == 0:
+            print("Warning: No questions were generated. Raw response was:", response)
+        
         return questions
 
     def extract_json_from_response(self, response: str) -> List[Dict]:
-        object_matches = re.findall(r'{[^{}]*?(?:"[^"]*":\s*"[^"]*?",?)*[^{}]*?}', response, re.DOTALL)
-        
-        valid_objects = []
-        for obj_str in object_matches:
-            try:
-                obj = json.loads(obj_str)
-                valid_objects.append(obj)
-            except json.JSONDecodeError:
-                continue
-        
-        return valid_objects
+        try:
+            # First try to parse the entire response as JSON
+            return json.loads(response)
+        except json.JSONDecodeError:
+            print("Failed to parse entire response as JSON, trying to extract JSON objects...")
+            
+            # Try to find JSON objects in the response
+            object_matches = re.findall(r'{[^{}]*?(?:"[^"]*":\s*"[^"]*?",?)*[^{}]*?}', response, re.DOTALL)
+            print(f"Found {len(object_matches)} potential JSON objects")
+            
+            valid_objects = []
+            for obj_str in object_matches:
+                try:
+                    obj = json.loads(obj_str)
+                    if all(key in obj for key in ["question", "answerA", "answerB", "answerC", "answerD", "correctAnswer"]):
+                        valid_objects.append(obj)
+                except json.JSONDecodeError as e:
+                    print(f"Failed to parse JSON object: {e}")
+                    continue
+            
+            print(f"Successfully parsed {len(valid_objects)} valid question objects")
+            return valid_objects
 
     def add_to_json(self, json_data: List[Dict], difficulty_str: str, chapter_number: int) -> List[Dict]:
         difficulty_map = {
