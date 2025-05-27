@@ -210,10 +210,16 @@ class graphRAG:
         # Process each document and split into chunks
         chunked_docs = []
         for document in doc:
-            chunks = text_splitter.split_text(document.text)
-            # Convert chunks back to Document objects
-            doc_chunks = [Document(text=chunk) for chunk in chunks]
-            chunked_docs.extend(doc_chunks)
+            try:
+                # Clean the text before splitting
+                cleaned_text = re.sub(r'[^\x00-\x7F]+', '', document.text)  # Remove non-ASCII characters
+                chunks = text_splitter.split_text(cleaned_text)
+                # Convert chunks back to Document objects
+                doc_chunks = [Document(text=chunk) for chunk in chunks]
+                chunked_docs.extend(doc_chunks)
+            except Exception as e:
+                print(f"Error processing document: {str(e)}")
+                continue
             
         # Replace original documents with chunked version
         doc = chunked_docs
@@ -232,21 +238,25 @@ class graphRAG:
         # Dictionary to track processing times for each LLM
         llm_processing_times = {name: [] for _, name in llms}
         llm_chunk_counts = {name: 0 for _, name in llms}
-        llm_request_counts = {name: 0 for _, name in llms}  # New dictionary to track requests
+        llm_request_counts = {name: 0 for _, name in llms}
         
         async def process_chunk(chunk, llm_tuple, chunk_index):
             llm, llm_name = llm_tuple
             chunk_start = time.time()
             try:
                 print(f"\n{llm_name} starting to process chunk {chunk_index}")
+                
+                # Clean the chunk text before processing
+                cleaned_chunk = Document(text=re.sub(r'[^\x00-\x7F]+', '', chunk.text))
+                
                 # Create PropertyGraphIndex with async support
                 result = PropertyGraphIndex.from_documents(
-                    [chunk],
+                    [cleaned_chunk],
                     llm=llm,
                     embed_model=self.embedding_model,
                     storage_context=storage_context,
                     use_async=True,
-                    num_workers=4,
+                    num_workers=1,  # Reduced number of workers
                     # show_progress=True
                 )
                 
@@ -254,9 +264,12 @@ class graphRAG:
                 processing_time = chunk_end - chunk_start
                 llm_processing_times[llm_name].append(processing_time)
                 llm_chunk_counts[llm_name] += 1
-                llm_request_counts[llm_name] += 1  # Increment request count
+                llm_request_counts[llm_name] += 1
                 print(f"{llm_name} completed chunk {chunk_index} in {processing_time:.2f} seconds (Total requests: {llm_request_counts[llm_name]})")
                 return result
+            except RecursionError as e:
+                print(f"Recursion error in {llm_name} processing chunk {chunk_index}: {str(e)}")
+                return None
             except Exception as e:
                 chunk_end = time.time()
                 processing_time = chunk_end - chunk_start
@@ -292,14 +305,14 @@ class graphRAG:
             return batch_duration
 
         # Calculate chunks per batch
-        chunks_per_batch = 25
+        chunks_per_batch = 10  # Reduced batch size
         total_batches = (len(doc) + chunks_per_batch - 1) // chunks_per_batch
         
         # Process batches in parallel, with each LLM handling its own batch
         round_counter = 0
         for batch_start in range(0, total_batches, len(llms)):
             round_counter += 1
-            round_requests = {llm_name: 0 for _, llm_name in llms}  # Track requests for this round
+            round_requests = {llm_name: 0 for _, llm_name in llms}
             batch_tasks = []
             for i, llm_tuple in enumerate(llms):
                 batch_number = batch_start + i
@@ -325,8 +338,8 @@ class graphRAG:
             
             # Sleep between rounds if there are more batches to process
             if batch_start + len(llms) < total_batches:
-                print("\nSleeping for 60 seconds before next round...")
-                await asyncio.sleep(60)  # Reduced sleep time for better performance
+                print("\nSleeping for 30 seconds before next round...")
+                await asyncio.sleep(30)  # Reduced sleep time
         
         # End timer and calculate duration
         end_time = time.time()
