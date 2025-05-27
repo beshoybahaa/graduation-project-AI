@@ -27,6 +27,8 @@ from llama_index.core.graph_stores import SimpleGraphStore
 from llama_index.core.async_utils import asyncio_run
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.gemini import Gemini
+from llama_index.llms.grok import Grok
+from llama_index.llms.together import Together_AI
 from llama_index.graph_stores.falkordb import FalkorDBGraphStore
 from llama_index.core.node_parser import TokenTextSplitter
 
@@ -104,61 +106,57 @@ class graphRAG:
     # load the model if not loaded
     def load_model(self):
         # Configure Gemini with API key from environment variable or fallback to hardcoded key
-        # api_key = os.getenv("GOOGLE_API_KEY", "AIzaSyCnhkm10JspaX-SPOw8eCtDeYsu8l52fiA")
-        # genai.configure(api_key="AIzaSyCnhkm10JspaX-SPOw8eCtDeYsu8l52fiA")
 
-        model_name = "gemini-2.0-flash-lite"
-        self.llm_questions = Gemini(
-            model=model_name,
-            # api_key="AIzaSyAwuVnbkTAMhR5-DxwYzwBN9-vilX_bnXY",
-            api_key="AIzaSyAiX12MRx1aU6GNLXZJ4Px9WSfIyWOU-sc",
+        self.llm_gemini = Gemini(
+            model="gemini-2.0-flash-lite",
+            api_key="AIzaSyAwuVnbkTAMhR5-DxwYzwBN9-vilX_bnXY",
             max_retries=2
         )
-        self.llm_1 = Gemini(
-            model=model_name,
-            api_key="AIzaSyBQfIuQshM7o4aM2t3kxC3bie67eCGG3Kk",
+        self.llm_groq = Grok(
+            model="gemma2-9b-it",
+            api_key="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",
             max_retries=2
         )
-        self.llm_2 = Gemini(
-            model=model_name,
-            api_key="AIzaSyDgFA3k1ayTmqzuEzuFKCpGlXKko9otX6o",
+        self.llm_together = Together_AI(
+            model="meta-llama/Llama-3.3-70B-Instruct-Turbo-Free",
+            api_key="tgp_v1_l2VKQAmfsfOF3R6jht38IvlWFwZ7bzEkqm2GVfjUL14",
             max_retries=2
         )
-        self.llm_3 = Gemini(
-            model=model_name,
-            api_key="AIzaSyBK1p3akSoS5ioEuMfuYD4Bq7K7pXqKnjw",
-            max_retries=2
-        )
-        self.llm_4 = Gemini(
-            model=model_name,
-            api_key="AIzaSyB09dUhjrfIJ7QPrsnV585S5b9z1KkuwS4",
-            max_retries=2
-        )
-        self.llm_5 = Gemini(
-            model=model_name,
-            api_key="AIzaSyAhoR1sPdMlRUwoKmD5jp4UUx131KKamKU",
-            max_retries=2
-        )
-        self.llm_6 = Gemini(
-            model=model_name,
-            api_key="AIzaSyDmEd3JRN6qv_0jfm4cHg5wHVrpAFiJYqE",
-            max_retries=2
-        )
-        self.llm_7 = Gemini(
-            model=model_name,
-            api_key="AIzaSyBtarGCXK7q_1PnZ3DBmzfyn-8EpCgl_VM",
-            max_retries=2
-        )
-        self.llm_8 = Gemini(
-            model=model_name,
-            api_key="AIzaSyCoK5ND4racg4JpTcBgNUT_r9J2-clzjNA",
-            max_retries=2
-        )
-        self.llm_9 = Gemini(
-            model=model_name,
-            api_key="AIzaSyBqGHbJr8e5MDG6cKmwQJw_xMydXxBQMXU",
-            max_retries=2
-        )
+        # self.llm_3 = Gemini(
+        #     model=model_name,
+        #     api_key="AIzaSyBK1p3akSoS5ioEuMfuYD4Bq7K7pXqKnjw",
+        #     max_retries=2
+        # )
+        # self.llm_4 = Gemini(
+        #     model=model_name,
+        #     api_key="AIzaSyB09dUhjrfIJ7QPrsnV585S5b9z1KkuwS4",
+        #     max_retries=2
+        # )
+        # self.llm_5 = Gemini(
+        #     model=model_name,
+        #     api_key="AIzaSyAhoR1sPdMlRUwoKmD5jp4UUx131KKamKU",
+        #     max_retries=2
+        # )
+        # self.llm_6 = Gemini(
+        #     model=model_name,
+        #     api_key="AIzaSyDmEd3JRN6qv_0jfm4cHg5wHVrpAFiJYqE",
+        #     max_retries=2
+        # )
+        # self.llm_7 = Gemini(
+        #     model=model_name,
+        #     api_key="AIzaSyBtarGCXK7q_1PnZ3DBmzfyn-8EpCgl_VM",
+        #     max_retries=2
+        # )
+        # self.llm_8 = Gemini(
+        #     model=model_name,
+        #     api_key="AIzaSyCoK5ND4racg4JpTcBgNUT_r9J2-clzjNA",
+        #     max_retries=2
+        # )
+        # self.llm_9 = Gemini(
+        #     model=model_name,
+        #     api_key="AIzaSyBqGHbJr8e5MDG6cKmwQJw_xMydXxBQMXU",
+        #     max_retries=2
+        # )
 
 
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
@@ -226,16 +224,9 @@ class graphRAG:
         
         # Create a list of LLMs to use with their names
         llms = [
-            (self.llm_1, "LLM_1"),
-            # (self.llm_2, "LLM_2"),
-            # (self.llm_3, "LLM_3"),
-            # (self.llm_4, "LLM_4"),
-            # (self.llm_5, "LLM_5"),
-            # (self.llm_6, "LLM_6"),
-            # (self.llm_7, "LLM_7"),
-            # (self.llm_8, "LLM_8"),
-            # (self.llm_9, "LLM_9"),
-            (self.llm_questions, "LLM_Questions")
+            (self.llm_groq, "groq"),
+            (self.llm_together, "together"),
+            (self.llm_gemini, "gemini"),
         ]
         
         # Dictionary to track processing times for each LLM
@@ -302,7 +293,7 @@ class graphRAG:
             return batch_duration
 
         # Calculate chunks per batch
-        chunks_per_batch = 20
+        chunks_per_batch = 25
         total_batches = (len(doc) + chunks_per_batch - 1) // chunks_per_batch
         
         # Process batches in parallel, with each LLM handling its own batch
