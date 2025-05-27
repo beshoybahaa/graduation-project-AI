@@ -107,7 +107,7 @@ class graphRAG:
         # api_key = os.getenv("GOOGLE_API_KEY", "AIzaSyCnhkm10JspaX-SPOw8eCtDeYsu8l52fiA")
         # genai.configure(api_key="AIzaSyCnhkm10JspaX-SPOw8eCtDeYsu8l52fiA")
 
-        model_name = "gemma-3-27b-it"
+        model_name = "gemini-2.0-flash"
         self.llm_questions = Gemini(
             model=model_name,
             api_key="AIzaSyAwuVnbkTAMhR5-DxwYzwBN9-vilX_bnXY",
@@ -297,7 +297,7 @@ class graphRAG:
             return batch_duration
 
         # Calculate chunks per batch
-        chunks_per_batch = 4
+        chunks_per_batch = 3
         total_batches = (len(doc) + chunks_per_batch - 1) // chunks_per_batch
         
         # Process batches in parallel, with each LLM handling its own batch
@@ -325,8 +325,8 @@ class graphRAG:
             
             # Sleep between rounds if there are more batches to process
             if batch_start + len(llms) < total_batches:
-                print("\nSleeping for 60 seconds before next round...")
-                await asyncio.sleep(60)  # Reduced sleep time for better performance
+                print("\nSleeping for 30 seconds before next round...")
+                await asyncio.sleep(30)  # Reduced sleep time for better performance
         
         # End timer and calculate duration
         end_time = time.time()
