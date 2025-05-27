@@ -66,8 +66,7 @@ class GeminiManager:
             await self.key_queue.put(key)
             return await self.call(prompt)
         finally:
-            if key not in (item for item in []):
-                await self.key_queue.put(key)
+            await self.key_queue.put(key)
 
 # ------------------------------ Prediction Models ------------------------------
 class Prediction(BaseModel):
@@ -113,11 +112,11 @@ class graphRAG:
                 except Exception as e:
                     print(f"Error cleaning directory {dir_path}: {str(e)}")
 
-    def load_doc(self, file, path):
+    async def load_doc(self, file, path):
         file_path = os.path.join(self.upload_dir, file.filename)
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        documents = SimpleDirectoryReader(self.upload_dir).load_data()
+        documents = await asyncio.to_thread(SimpleDirectoryReader(self.upload_dir).load_data)
         return documents
 
     async def index_doc(self, doc, path):
@@ -125,19 +124,29 @@ class graphRAG:
         text_splitter = TokenTextSplitter(chunk_size=Settings.chunk_size, chunk_overlap=Settings.chunk_overlap)
         chunked_docs = []
         for document in doc:
-            chunks = text_splitter.split_text(document.text)
+            chunks = await asyncio.to_thread(text_splitter.split_text, document.text)
             doc_chunks = [Document(text=chunk) for chunk in chunks]
             chunked_docs.extend(doc_chunks)
         doc = chunked_docs
 
         print(f"Total chunks: {len(doc)}")
-        for i, chunk in enumerate(doc):
-            prompt = chunk.text[:1500]
-            try:
-                await self.gemini.call(prompt)  # Can be enhanced to do graph building with LlamaIndex
-            except Exception as e:
-                print(f"Error processing chunk {i}: {e}")
-        self.index = PropertyGraphIndex.from_documents(
+        
+        # Process chunks with 4-way concurrency
+        semaphore = asyncio.Semaphore(4)
+        
+        async def process_chunk(chunk):
+            async with semaphore:
+                prompt = chunk.text[:1500]
+                try:
+                    await self.gemini.call(prompt)
+                except Exception as e:
+                    print(f"Error processing chunk: {e}")
+
+        await asyncio.gather(*[process_chunk(chunk) for chunk in doc])
+
+        # Async index creation
+        self.index = await asyncio.to_thread(
+            PropertyGraphIndex.from_documents,
             doc,
             embed_model=self.embedding_model,
             storage_context=storage_context,
@@ -200,17 +209,19 @@ async def predict(file: Annotated[UploadFile, File()]):
         path = "./"
         graph.load_model = lambda: None  # no-op since keys/embedding initialized in constructor
 
-        document = graph.load_doc(file, path)
+        document = await graph.load_doc(file, path)
         await graph.index_doc(document, path)
         graph.load_index(path)
 
-        json_data_all = []
-        for i in ["easy", "medium", "hard"]:
-            response = await graph.prediction(i)
+        async def get_prediction(difficulty):
+            response = await graph.prediction(difficulty)
             json_data = graph.extract_json_from_response(response)
-            json_data = graph.add_to_json(json_data, i, 1)
-            json_data_all.extend(json_data)
-            await asyncio.sleep(2)
+            return graph.add_to_json(json_data, difficulty, 1)
+
+        # Process difficulty levels concurrently
+        tasks = [get_prediction(difficulty) for difficulty in ["easy", "medium", "hard"]]
+        results = await asyncio.gather(*tasks)
+        json_data_all = [item for sublist in results for item in sublist]
 
         graph.clear_neo4j()
         return JSONResponse(content=json_data_all)
