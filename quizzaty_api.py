@@ -254,7 +254,7 @@ class graphRAG:
                     embed_model=self.embedding_model,
                     storage_context=storage_context,
                     use_async=True,
-                    num_workers=3,
+                    num_workers=1,
                     # show_progress=True
                 )
                 
