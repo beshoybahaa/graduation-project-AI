@@ -171,17 +171,22 @@ class GraphRAG:
             # Process the chunk and add to graph
             print(f"Processing chunk {chunk_index} with content: {chunk.page_content[:100]}...")
             result = await chain.arun(chunk.page_content)
-            print(f"Graph nodes after processing chunk {chunk_index}: {len(networkx_graph.get_nodes())}")
-            print(f"Graph edges after processing chunk {chunk_index}: {len(networkx_graph.get_edges())}")
+            
+            # Get the graph data
+            nodes = list(networkx_graph._graph.nodes())
+            edges = list(networkx_graph._graph.edges())
+            
+            print(f"Graph nodes after processing chunk {chunk_index}: {len(nodes)}")
+            print(f"Graph edges after processing chunk {chunk_index}: {len(edges)}")
             
             # Add the processed graph to Neo4j
-            for node in networkx_graph.get_nodes():
+            for node in nodes:
                 self.graph.query(
                     "MERGE (n:Entity {name: $name}) SET n += $properties",
                     {"name": node, "properties": {"type": "concept"}}
                 )
             
-            for edge in networkx_graph.get_edges():
+            for edge in edges:
                 self.graph.query(
                     """
                     MATCH (source:Entity {name: $source})
@@ -288,13 +293,15 @@ class GraphRAG:
         # Add the data to the Networkx graph
         for record in graph_data:
             if record['n']:
-                networkx_graph.add_node(record['n']['name'])
+                networkx_graph._graph.add_node(record['n']['name'])
             if record['m']:
-                networkx_graph.add_node(record['m']['name'])
+                networkx_graph._graph.add_node(record['m']['name'])
             if record['r']:
-                networkx_graph.add_edge(record['n']['name'], record['m']['name'])
+                networkx_graph._graph.add_edge(record['n']['name'], record['m']['name'])
 
-        print(f"Loaded graph with {len(networkx_graph.get_nodes())} nodes and {len(networkx_graph.get_edges())} edges")
+        nodes = list(networkx_graph._graph.nodes())
+        edges = list(networkx_graph._graph.edges())
+        print(f"Loaded graph with {len(nodes)} nodes and {len(edges)} edges")
 
         # Generate questions using the populated graph
         response = await chain.arun(
