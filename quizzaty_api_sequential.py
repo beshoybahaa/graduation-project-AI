@@ -207,7 +207,7 @@ class graphRAG:
                     storage_context=storage_context,
                     num_workers=2,  # Reduced number of workers
                     chunk_sleep_time=5.0,
-                    # show_progress=True
+                    show_progress=True
 
                 )
         return self.index
