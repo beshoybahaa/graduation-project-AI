@@ -232,7 +232,7 @@ class graphRAG:
         llms = [
             (self.llm_groq, "groq"),
             # (self.llm_together, "together"),
-            (self.llm_gemini, "gemini"),
+            # (self.llm_gemini, "gemini"),
         ]
         
         # Dictionary to track processing times for each LLM
