@@ -43,9 +43,13 @@ class GeminiManager:
 
     async def call(self, prompt):
         key = await self.key_queue.get()
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={key}"
+        url = f"https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key={key}"
         headers = {"Content-Type": "application/json"}
-        payload = {"contents": [{"parts": [{"text": prompt}]}]}
+        payload = {
+            "contents": [{
+                "parts": [{"text": prompt}]
+            }]
+        }
 
         try:
             async with self.semaphore:
@@ -53,15 +57,20 @@ class GeminiManager:
                     resp = await client.post(url, headers=headers, json=payload)
                     resp.raise_for_status()
                     data = resp.json()
-                    return data["candidates"][0]["content"]["parts"][0]["text"]
+                    if "candidates" in data and len(data["candidates"]) > 0:
+                        return data["candidates"][0]["content"]["parts"][0]["text"]
+                    else:
+                        raise Exception("No response from Gemini API")
         except httpx.HTTPStatusError as e:
-            if e.response.status_code == 429:
+            if e.response.status_code == 429:  # Rate limit
                 await asyncio.sleep(60 + random.random() * 5)
                 await self.key_queue.put(key)
                 return await self.call(prompt)
             else:
+                print(f"HTTP Error: {e.response.status_code} - {e.response.text}")
                 raise
         except Exception as e:
+            print(f"Error calling Gemini API: {str(e)}")
             await asyncio.sleep(1 + random.random())
             await self.key_queue.put(key)
             return await self.call(prompt)
