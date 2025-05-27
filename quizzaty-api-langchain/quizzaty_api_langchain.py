@@ -171,17 +171,17 @@ class GraphRAG:
             # Process the chunk and add to graph
             print(f"Processing chunk {chunk_index} with content: {chunk.page_content[:100]}...")
             result = await chain.arun(chunk.page_content)
-            print(f"Graph nodes after processing chunk {chunk_index}: {len(networkx_graph.graph.nodes())}")
-            print(f"Graph edges after processing chunk {chunk_index}: {len(networkx_graph.graph.edges())}")
+            print(f"Graph nodes after processing chunk {chunk_index}: {len(networkx_graph.get_nodes())}")
+            print(f"Graph edges after processing chunk {chunk_index}: {len(networkx_graph.get_edges())}")
             
             # Add the processed graph to Neo4j
-            for node, data in networkx_graph.graph.nodes(data=True):
+            for node in networkx_graph.get_nodes():
                 self.graph.query(
                     "MERGE (n:Entity {name: $name}) SET n += $properties",
-                    {"name": node, "properties": data}
+                    {"name": node, "properties": {"type": "concept"}}
                 )
             
-            for source, target, data in networkx_graph.graph.edges(data=True):
+            for edge in networkx_graph.get_edges():
                 self.graph.query(
                     """
                     MATCH (source:Entity {name: $source})
@@ -189,7 +189,7 @@ class GraphRAG:
                     MERGE (source)-[r:RELATES_TO]->(target)
                     SET r += $properties
                     """,
-                    {"source": source, "target": target, "properties": data}
+                    {"source": edge[0], "target": edge[1], "properties": {"type": "relationship"}}
                 )
             
             return True
@@ -288,17 +288,13 @@ class GraphRAG:
         # Add the data to the Networkx graph
         for record in graph_data:
             if record['n']:
-                networkx_graph.graph.add_node(record['n']['name'], **record['n'])
+                networkx_graph.add_node(record['n']['name'])
             if record['m']:
-                networkx_graph.graph.add_node(record['m']['name'], **record['m'])
+                networkx_graph.add_node(record['m']['name'])
             if record['r']:
-                networkx_graph.graph.add_edge(
-                    record['n']['name'],
-                    record['m']['name'],
-                    **record['r']
-                )
+                networkx_graph.add_edge(record['n']['name'], record['m']['name'])
 
-        print(f"Loaded graph with {len(networkx_graph.graph.nodes())} nodes and {len(networkx_graph.graph.edges())} edges")
+        print(f"Loaded graph with {len(networkx_graph.get_nodes())} nodes and {len(networkx_graph.get_edges())} edges")
 
         # Generate questions using the populated graph
         response = await chain.arun(
