@@ -202,7 +202,7 @@ class graphRAG:
         storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
         self.index = PropertyGraphIndex.from_documents(
                     doc,
-                    llm=self.llm_groq,
+                    llm=self.llm_gemini,
                     embed_model=self.embedding_model,
                     storage_context=storage_context,
                     num_workers=2,  # Reduced number of workers
