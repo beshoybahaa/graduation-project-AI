@@ -113,7 +113,7 @@ class graphRAG:
             max_retries=2
         )
         self.llm_groq = Groq(
-            model="llama-3.1-8b-instant",
+            model="llama-guard-3-8b",
             api_key="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",
             max_retries=2
         )
@@ -232,7 +232,7 @@ class graphRAG:
         llms = [
             (self.llm_groq, "groq"),
             # (self.llm_together, "together"),
-            # (self.llm_gemini, "gemini"),
+            (self.llm_gemini, "gemini"),
         ]
         
         # Dictionary to track processing times for each LLM
