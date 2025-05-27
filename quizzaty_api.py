@@ -305,7 +305,7 @@ class graphRAG:
             return batch_duration
 
         # Calculate chunks per batch
-        chunks_per_batch = 20  # Reduced batch size
+        chunks_per_batch = 25  # Reduced batch size
         total_batches = (len(doc) + chunks_per_batch - 1) // chunks_per_batch
         
         # Process batches in parallel, with each LLM handling its own batch
@@ -338,8 +338,8 @@ class graphRAG:
             
             # Sleep between rounds if there are more batches to process
             if batch_start + len(llms) < total_batches:
-                print("\nSleeping for 30 seconds before next round...")
-                await asyncio.sleep(30)  # Reduced sleep time
+                print("\nSleeping for 60 seconds before next round...")
+                await asyncio.sleep(60)  # Reduced sleep time
         
         # End timer and calculate duration
         end_time = time.time()
