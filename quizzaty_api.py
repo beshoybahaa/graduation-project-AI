@@ -110,7 +110,8 @@ class graphRAG:
         model_name = "gemini-2.0-flash-lite"
         self.llm_questions = Gemini(
             model=model_name,
-            api_key="AIzaSyAwuVnbkTAMhR5-DxwYzwBN9-vilX_bnXY",
+            # api_key="AIzaSyAwuVnbkTAMhR5-DxwYzwBN9-vilX_bnXY",
+            api_key="AIzaSyAiX12MRx1aU6GNLXZJ4Px9WSfIyWOU-sc",
             max_retries=2
         )
         self.llm_1 = Gemini(
@@ -226,7 +227,7 @@ class graphRAG:
         # Create a list of LLMs to use with their names
         llms = [
             (self.llm_1, "LLM_1"),
-            (self.llm_2, "LLM_2"),
+            # (self.llm_2, "LLM_2"),
             # (self.llm_3, "LLM_3"),
             # (self.llm_4, "LLM_4"),
             # (self.llm_5, "LLM_5"),
@@ -234,7 +235,7 @@ class graphRAG:
             # (self.llm_7, "LLM_7"),
             # (self.llm_8, "LLM_8"),
             # (self.llm_9, "LLM_9"),
-            # (self.llm_questions, "LLM_Questions")
+            (self.llm_questions, "LLM_Questions")
         ]
         
         # Dictionary to track processing times for each LLM
@@ -301,7 +302,7 @@ class graphRAG:
             return batch_duration
 
         # Calculate chunks per batch
-        chunks_per_batch = 15
+        chunks_per_batch = 25
         total_batches = (len(doc) + chunks_per_batch - 1) // chunks_per_batch
         
         # Process batches in parallel, with each LLM handling its own batch
