@@ -207,14 +207,18 @@ class graphRAG:
             chunk_start = time.time()
             try:
                 print(f"\n{llm_name} starting to process chunk {chunk_index}")
-                # Create PropertyGraphIndex asynchronously
-                result = await PropertyGraphIndex.from_documents(
+                # Create PropertyGraphIndex with async support
+                result = PropertyGraphIndex.from_documents(
                     [chunk],
                     llm=llm,
                     embed_model=self.embedding_model,
                     storage_context=storage_context,
-                    use_async=True
+                    use_async=True,
+                    show_progress=True
                 )
+                # Wait for the async operations to complete
+                await result.async_refresh()
+                
                 chunk_end = time.time()
                 processing_time = chunk_end - chunk_start
                 llm_processing_times[llm_name].append(processing_time)
