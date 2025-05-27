@@ -216,8 +216,6 @@ class graphRAG:
                     use_async=True,
                     show_progress=True
                 )
-                # Wait for the async operations to complete
-                await result.async_refresh()
                 
                 chunk_end = time.time()
                 processing_time = chunk_end - chunk_start
