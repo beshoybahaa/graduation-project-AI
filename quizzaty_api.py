@@ -227,14 +227,14 @@ class graphRAG:
         llms = [
             (self.llm_1, "LLM_1"),
             (self.llm_2, "LLM_2"),
-            (self.llm_3, "LLM_3"),
-            (self.llm_4, "LLM_4"),
-            (self.llm_5, "LLM_5"),
-            (self.llm_6, "LLM_6"),
-            (self.llm_7, "LLM_7"),
-            (self.llm_8, "LLM_8"),
-            (self.llm_9, "LLM_9"),
-            (self.llm_questions, "LLM_Questions")
+            # (self.llm_3, "LLM_3"),
+            # (self.llm_4, "LLM_4"),
+            # (self.llm_5, "LLM_5"),
+            # (self.llm_6, "LLM_6"),
+            # (self.llm_7, "LLM_7"),
+            # (self.llm_8, "LLM_8"),
+            # (self.llm_9, "LLM_9"),
+            # (self.llm_questions, "LLM_Questions")
         ]
         
         # Dictionary to track processing times for each LLM
@@ -301,7 +301,7 @@ class graphRAG:
             return batch_duration
 
         # Calculate chunks per batch
-        chunks_per_batch = 3
+        chunks_per_batch = 10
         total_batches = (len(doc) + chunks_per_batch - 1) // chunks_per_batch
         
         # Process batches in parallel, with each LLM handling its own batch
