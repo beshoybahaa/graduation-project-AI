@@ -307,68 +307,71 @@ def index():
 
 # post request that takes a review (text type) and returns a sentiment score
 @app.post('/questions')
-async def predict(file: Annotated[UploadFile, File()]):
+async def predict(file: Annotated[UploadFile, File()], chapter_number: int = Form(1)):
     try:
         path = "./"
         print(f"Received file: {file.filename}")
-        print(f"Received path: {path}")
+        print(f"Chapter number: {chapter_number}")
         
-        # Initialize models
         try:
+            print("Starting model loading...")
             graphrag.load_model()
-            print("load_model : done")
+            print("Model loading completed successfully")
         except Exception as e:
+            print(f"Error loading model: {str(e)}")
             return JSONResponse(
                 status_code=500,
                 content={"error": "Model Loading Error", "step": "load_model", "details": str(e)}
             )
 
-        # Load and process document
         try:
+            print("Starting document loading...")
             document = graphrag.load_doc(file, path)
-            print("load_doc : done")
+            print(f"Document loading completed. Number of documents: {len(document)}")
         except Exception as e:
+            print(f"Error loading document: {str(e)}")
             return JSONResponse(
                 status_code=500,
                 content={"error": "Document Loading Error", "step": "load_doc", "details": str(e)}
             )
 
-        # Index document
         try:
+            print("Starting document indexing...")
             await graphrag.index_doc(document, path)
-            print("index_doc : done")
+            print("Document indexing completed")
         except Exception as e:
+            print(f"Error indexing document: {str(e)}")
             return JSONResponse(
                 status_code=500,
                 content={"error": "Document Indexing Error", "step": "index_doc", "details": str(e)}
             )
 
-        # Load index
         try:
+            print("Starting index loading...")
             graphrag.load_index(path)
-            print("load_index : done")
+            print("Index loading completed")
         except Exception as e:
+            print(f"Error loading index: {str(e)}")
             return JSONResponse(
                 status_code=500,
                 content={"error": "Index Loading Error", "step": "load_index", "details": str(e)}
             )
 
-        # Generate questions for each difficulty level
         json_data_all = []
         for i in ["easy", "medium", "hard"]:
             try:
+                print(f"Generating questions for {i} difficulty...")
                 test = await graphrag.prediction(i)
-                print(type(test))
+                print(f"Generated {i} difficulty questions")
                 response_answer = str(test)
                 json_data = graphrag.extract_json_from_response(response_answer)
-                print("extract_json_from_response : done")
-                json_data = graphrag.add_to_json(json_data, i, 1)
-                print("add to json : done")
+                print(f"Extracted {len(json_data)} questions from response")
+                json_data = graphrag.add_to_json(json_data, i, chapter_number)
                 json_data_all.extend(json_data)
-                print(f"difficulty {i}: done")
-                # Add a small delay between API calls to avoid rate limiting
-                await asyncio.sleep(3)
+                print(f"Completed {i} difficulty level")
+                time.sleep(3)
             except Exception as e:
+                print(f"Error generating {i} difficulty questions: {str(e)}")
                 return JSONResponse(
                     status_code=500,
                     content={
@@ -378,18 +381,18 @@ async def predict(file: Annotated[UploadFile, File()]):
                     }
                 )
 
-        # Cleanup
         try:
+            print("Cleaning up...")
             graphrag.clear_neo4j()
+            print("Cleanup completed")
         except Exception as e:
             print(f"Warning: Error during cleanup: {str(e)}")
-            # Don't return error for cleanup issues, just log it
             
-        return JSONResponse(content={
-            "questions": json_data_all
-        })
+        print(f"Successfully generated {len(json_data_all)} total questions")
+        return JSONResponse(content=json_data_all)
         
     except Exception as e:
+        print(f"Unexpected error: {str(e)}")
         return JSONResponse(
             status_code=500,
             content={"error": "Unexpected Error", "step": "general", "details": str(e)}
