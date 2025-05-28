@@ -186,8 +186,8 @@ class graphRAG:
         
         # Configure text splitter for better chunking
         text_splitter = TokenTextSplitter(
-            chunk_size=5000,  # Reduced chunk size
-            chunk_overlap=1000,  # Reduced overlap
+            chunk_size=1000,  # Reduced chunk size
+            chunk_overlap=200,  # Reduced overlap
             separator="\n"
         )
         
