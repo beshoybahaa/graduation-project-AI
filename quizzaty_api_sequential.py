@@ -207,6 +207,8 @@ class graphRAG:
                     storage_context=storage_context,
                     num_workers=2,  # Reduced number of workers
                     chunk_sleep_time=10.0,
+                    chunk_size=1024,
+                    chunk_overlap=100,
                     show_progress=True
 
                 )
