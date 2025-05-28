@@ -113,8 +113,8 @@ class graphRAG:
             max_retries=2
         )
         self.llm_groq = Groq(
-            model="llama3-70b-8192",
-            api_key="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",
+            model="gemma2-9b-it",
+            api_key="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",
             max_retries=2
         )
         self.llm_together = TogetherLLM(
@@ -161,9 +161,6 @@ class graphRAG:
 
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
-        Settings.chunk_size = 500
-        Settings.chunk_overlap = 200
-
         return
 
     # load the uploaded document
@@ -183,36 +180,32 @@ class graphRAG:
             raise
 
     async def index_doc(self, doc, path):
+                # Set global settings
+        # Settings.num_workers = 4
+        # Settings.llm = self.llm_questions
+        # self.index = PropertyGraphIndex.from_documents(
+        #     doc,
+        #     llm=self.llm_questions,
+        #     embed_model=self.embedding_model,
+        #     storage_context=storage_context,  # Use the created storage context
+        #     show_progress=True,
+        #     num_workers=2,
+        #     chunk_size=1024,  # Process 1024 tokens per chunk
+        #     chunk_overlap=100,  # 300 token overlap between chunks
+        #     chunk_sleep_time=90.0  # Sleep 1 second between chunks
+        # )
         print("Initializing shared SimpleGraphStore...")
         # Create storage context with the graph store
         storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
-        
-        # Configure chunk size and overlap
-        Settings.chunk_size = 500  # Smaller chunks to reduce API load
-        Settings.chunk_overlap = 100
-        
-        # Process documents in smaller batches
-        batch_size = 5  # Process 5 chunks at a time
-        all_nodes = []
-        
-        # Split documents into chunks
-        text_splitter = TokenTextSplitter(chunk_size=500, chunk_overlap=100)
-        chunks = text_splitter.split_text(doc)
-        
-        # Process chunks in batches
-        for i in range(0, len(chunks), batch_size):
-            batch = chunks[i:i + batch_size]
-            self.index = PropertyGraphIndex.from_documents(
-                batch,
-                llm=self.llm_gemini,
-                embed_model=self.embedding_model,
-                storage_context=storage_context,
-                num_workers=1,
-                show_progress=True
-            )
-            # Add delay between batches to avoid rate limiting
-            await asyncio.sleep(2)  # 2 second delay between batches
-            
+        self.index = PropertyGraphIndex.from_documents(
+                    doc,
+                    llm=self.llm_groq,
+                    embed_model=self.embedding_model,
+                    storage_context=storage_context,
+                    num_workers=2,  # Reduced number of workers
+                    show_progress=True
+
+                )
         return self.index
 
     # load the index
@@ -220,7 +213,7 @@ class graphRAG:
         try:
             # Create query engine for PropertyGraphIndex
             self.query_engine = self.index.as_query_engine(
-                llm=self.llm_gemini,
+                llm=self.llm_groq,
                 storage_context=self.index.storage_context,
                 include_text=True,  # Include the text in the response
                 response_mode="tree_summarize"  # Use tree summarization for better responses
