@@ -197,7 +197,7 @@ class graphRAG:
         
         # Split documents into chunks
         text_splitter = TokenTextSplitter(chunk_size=500, chunk_overlap=100)
-        chunks = text_splitter.split_documents(doc)
+        chunks = text_splitter.split_text(doc)
         
         # Process chunks in batches
         for i in range(0, len(chunks), batch_size):
