@@ -183,35 +183,36 @@ class graphRAG:
             raise
 
     async def index_doc(self, doc, path):
-                # Set global settings
-        # Settings.num_workers = 4
-        # Settings.llm = self.llm_questions
-        # self.index = PropertyGraphIndex.from_documents(
-        #     doc,
-        #     llm=self.llm_questions,
-        #     embed_model=self.embedding_model,
-        #     storage_context=storage_context,  # Use the created storage context
-        #     show_progress=True,
-        #     num_workers=2,
-        #     chunk_size=1024,  # Process 1024 tokens per chunk
-        #     chunk_overlap=100,  # 300 token overlap between chunks
-        #     chunk_sleep_time=90.0  # Sleep 1 second between chunks
-        # )
         print("Initializing shared SimpleGraphStore...")
         # Create storage context with the graph store
         storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
-        self.index = PropertyGraphIndex.from_documents(
-                    doc,
-                    llm=self.llm_gemini,
-                    embed_model=self.embedding_model,
-                    storage_context=storage_context,
-                    num_workers=1,  # Reduced number of workers
-                    chunk_sleep_time=10.0,
-                    chunk_size=1024,
-                    chunk_overlap=100,
-                    show_progress=True
-
-                )
+        
+        # Configure chunk size and overlap
+        Settings.chunk_size = 500  # Smaller chunks to reduce API load
+        Settings.chunk_overlap = 100
+        
+        # Process documents in smaller batches
+        batch_size = 5  # Process 5 chunks at a time
+        all_nodes = []
+        
+        # Split documents into chunks
+        text_splitter = TokenTextSplitter(chunk_size=500, chunk_overlap=100)
+        chunks = text_splitter.split_documents(doc)
+        
+        # Process chunks in batches
+        for i in range(0, len(chunks), batch_size):
+            batch = chunks[i:i + batch_size]
+            self.index = PropertyGraphIndex.from_documents(
+                batch,
+                llm=self.llm_gemini,
+                embed_model=self.embedding_model,
+                storage_context=storage_context,
+                num_workers=1,
+                show_progress=True
+            )
+            # Add delay between batches to avoid rate limiting
+            await asyncio.sleep(2)  # 2 second delay between batches
+            
         return self.index
 
     # load the index
