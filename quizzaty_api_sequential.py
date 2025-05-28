@@ -213,7 +213,7 @@ class graphRAG:
         try:
             # Create query engine for PropertyGraphIndex
             self.query_engine = self.index.as_query_engine(
-                llm=self.llm_questions,
+                llm=self.llm_groq,
                 embed_model=self.embedding_model,
                 storage_context=self.index.storage_context
             )
