@@ -293,95 +293,6 @@ class graphRAG:
             item["chapterNo"] = chapter_number
     
         return json_data
-
-    def generate_graph_visualization(self):
-        """Generate an HTML visualization of the knowledge graph."""
-        try:
-            # Get graph data from the graph store
-            nodes = []
-            edges = []
-            
-            # Get all nodes and edges from the graph store
-            for node in self.graph_store.get_nodes():
-                nodes.append({
-                    'id': node.id,
-                    'label': node.properties.get('text', ''),
-                    'group': node.properties.get('type', 'default')
-                })
-            
-            for edge in self.graph_store.get_edges():
-                edges.append({
-                    'from': edge.source,
-                    'to': edge.target,
-                    'label': edge.properties.get('type', ''),
-                    'arrows': 'to'
-                })
-
-            # Create HTML template with vis.js for visualization
-            html_template = """
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Knowledge Graph Visualization</title>
-                <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
-                <style type="text/css">
-                    #graph-container {
-                        width: 100%;
-                        height: 800px;
-                        border: 1px solid lightgray;
-                    }
-                </style>
-            </head>
-            <body>
-                <div id="graph-container"></div>
-                <script type="text/javascript">
-                    // Create nodes and edges arrays
-                    var nodes = new vis.DataSet(%s);
-                    var edges = new vis.DataSet(%s);
-
-                    // Create a network
-                    var container = document.getElementById('graph-container');
-                    var data = {
-                        nodes: nodes,
-                        edges: edges
-                    };
-                    var options = {
-                        nodes: {
-                            shape: 'dot',
-                            size: 16,
-                            font: {
-                                size: 12
-                            }
-                        },
-                        edges: {
-                            font: {
-                                size: 12,
-                                align: 'middle'
-                            },
-                            smooth: {
-                                type: 'continuous'
-                            }
-                        },
-                        physics: {
-                            stabilization: false,
-                            barnesHut: {
-                                gravitationalConstant: -80000,
-                                springConstant: 0.001,
-                                springLength: 200
-                            }
-                        }
-                    };
-                    var network = new vis.Network(container, data, options);
-                </script>
-            </body>
-            </html>
-            """ % (json.dumps(nodes), json.dumps(edges))
-
-            return html_template
-        except Exception as e:
-            print(f"Error generating graph visualization: {str(e)}")
-            return None
-
 # create the app
 app = FastAPI()
 
@@ -467,9 +378,6 @@ async def predict(file: Annotated[UploadFile, File()]):
                     }
                 )
 
-        # Generate graph visualization
-        graph_html = graphrag.generate_graph_visualization()
-
         # Cleanup
         try:
             graphrag.clear_neo4j()
@@ -478,8 +386,7 @@ async def predict(file: Annotated[UploadFile, File()]):
             # Don't return error for cleanup issues, just log it
             
         return JSONResponse(content={
-            "questions": json_data_all,
-            "graph_visualization": graph_html
+            "questions": json_data_all
         })
         
     except Exception as e:
