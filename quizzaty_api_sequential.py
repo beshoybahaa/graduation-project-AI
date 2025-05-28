@@ -186,15 +186,15 @@ class graphRAG:
         
         # Configure text splitter for better chunking
         text_splitter = TokenTextSplitter(
-            chunk_size=1000,  # Reduced chunk size
-            chunk_overlap=300,  # Reduced overlap
+            chunk_size=5000,  # Reduced chunk size
+            chunk_overlap=1000,  # Reduced overlap
             separator="\n"
         )
         
         # Configure path extractor for graph construction
         path_extractor = SimpleLLMPathExtractor(
             llm=self.llm_groq,
-            max_paths_per_chunk=20  # Limit the number of paths extracted per chunk
+            # max_paths_per_chunk=20  # Limit the number of paths extracted per chunk
         )
         
         self.index = PropertyGraphIndex.from_documents(
