@@ -237,7 +237,7 @@ class graphRAG:
                 C)	Jitter
                 D)	All of the choices are correct
             
-            Please ensure that the questions reflect a deep understanding of the chapter's main ideas and concepts while varying the complexity to accommodate different levels of knowledge. Provide 40 questions for {difficulty_level} level. "AND DON'T REPEATE THE QUESTIONS".
+            Please ensure that the questions reflect a deep understanding of the chapter's main ideas and concepts while varying the complexity to accommodate different levels of knowledge. Provide 40 questions for {difficulty_level} level.
             
             Begin by analyzing the chapter content thoroughly to extract key concepts, terms, and themes that can be transformed into question formats. 
             
