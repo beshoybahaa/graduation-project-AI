@@ -180,41 +180,43 @@ class graphRAG:
             raise
 
     async def index_doc(self, doc, path):
-                # Set global settings
-        # Settings.num_workers = 4
-        # Settings.llm = self.llm_questions
-        # self.index = PropertyGraphIndex.from_documents(
-        #     doc,
-        #     llm=self.llm_questions,
-        #     embed_model=self.embedding_model,
-        #     storage_context=storage_context,  # Use the created storage context
-        #     show_progress=True,
-        #     num_workers=2,
-        #     chunk_size=1024,  # Process 1024 tokens per chunk
-        #     chunk_overlap=100,  # 300 token overlap between chunks
-        #     chunk_sleep_time=90.0  # Sleep 1 second between chunks
-        # )
         print("Initializing shared SimpleGraphStore...")
         # Create storage context with the graph store
         storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
+        
+        # Configure text splitter for better chunking
+        text_splitter = TokenTextSplitter(
+            chunk_size=512,  # Reduced chunk size
+            chunk_overlap=100,  # Reduced overlap
+            separator="\n"
+        )
+        
+        # Configure path extractor for graph construction
+        path_extractor = SimpleLLMPathExtractor(
+            llm=self.llm_groq,
+            max_paths_per_chunk=3  # Limit the number of paths extracted per chunk
+        )
+        
         self.index = PropertyGraphIndex.from_documents(
-                    doc,
-                    llm=self.llm_groq,
-                    embed_model=self.embedding_model,
-                    storage_context=storage_context,
-                    num_workers=2,  # Reduced number of workers
-                    show_progress=True
-
-                )
+            doc,
+            llm=self.llm_groq,
+            embed_model=self.embedding_model,
+            storage_context=storage_context,
+            num_workers=2,
+            show_progress=True,
+            text_splitter=text_splitter,
+            path_extractor=path_extractor
+        )
         return self.index
 
     # load the index
     def load_index(self, path):
-            # Create query engine for PropertyGraphIndex
+        # Create query engine for PropertyGraphIndex
         self.query_engine = self.index.as_query_engine(
             llm=self.llm_groq,
-            storage_context=self.index.storage_context
-            )
+            storage_context=self.index.storage_context,
+            response_mode="compact"  # Use compact response mode to reduce context usage
+        )
         return
         
     # prediction
