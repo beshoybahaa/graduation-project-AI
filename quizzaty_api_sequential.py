@@ -237,11 +237,10 @@ class graphRAG:
                 C)	Jitter
                 D)	All of the choices are correct
             
-            Please ensure that the questions reflect a deep understanding of the chapter's main ideas and concepts while varying the complexity to accommodate different levels of knowledge. Provide 40 questions for {difficulty_level} level. 
+            Please ensure that the questions reflect a deep understanding of the chapter's main ideas and concepts while varying the complexity to accommodate different levels of knowledge. Provide 40 questions for {difficulty_level} level. "AND DON'T REPEATE THE QUESTIONS".
             
             Begin by analyzing the chapter content thoroughly to extract key concepts, terms, and themes that can be transformed into question formats. 
             
-            End the generated MCQs with a summary statement of the chapter's main subject to reinforce learning.
             and make the output form in json form like thie example : 
             {{
             "question":"Which of the following is not one of the characteristics of a data communication system?",
