@@ -194,7 +194,7 @@ class graphRAG:
         # Configure path extractor for graph construction
         path_extractor = SimpleLLMPathExtractor(
             llm=self.llm_groq,
-            # max_paths_per_chunk=20  # Limit the number of paths extracted per chunk
+            max_paths_per_chunk=60  # Limit the number of paths extracted per chunk
         )
         
         self.index = PropertyGraphIndex.from_documents(
