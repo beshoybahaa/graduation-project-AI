@@ -202,10 +202,9 @@ class graphRAG:
             llm=self.llm_groq,
             embed_model=self.embedding_model,
             storage_context=storage_context,
-            num_workers=2,
             show_progress=True,
-            text_splitter=text_splitter,
-            path_extractor=path_extractor
+            # text_splitter=text_splitter,
+            # path_extractor=path_extractor
         )
         return self.index
 
@@ -214,8 +213,6 @@ class graphRAG:
         # Create query engine for PropertyGraphIndex
         self.query_engine = self.index.as_query_engine(
             llm=self.llm_groq,
-            storage_context=self.index.storage_context,
-            response_mode="compact"  # Use compact response mode to reduce context usage
         )
         return
         
