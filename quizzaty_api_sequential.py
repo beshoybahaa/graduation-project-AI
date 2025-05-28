@@ -213,10 +213,9 @@ class graphRAG:
         try:
             # Create query engine for PropertyGraphIndex
             self.query_engine = self.index.as_query_engine(
-                llm=self.llm_groq,
-                storage_context=self.index.storage_context,
-                include_text=True,  # Include the text in the response
-                response_mode="tree_summarize"  # Use tree summarization for better responses
+                llm=self.llm_questions,
+                embed_model=self.embedding_model,
+                storage_context=self.index.storage_context
             )
             return
         except Exception as e:
