@@ -205,7 +205,7 @@ class graphRAG:
                     llm=self.llm_gemini,
                     embed_model=self.embedding_model,
                     storage_context=storage_context,
-                    num_workers=2,  # Reduced number of workers
+                    num_workers=1,  # Reduced number of workers
                     chunk_sleep_time=10.0,
                     chunk_size=1024,
                     chunk_overlap=100,
