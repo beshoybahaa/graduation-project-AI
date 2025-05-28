@@ -254,7 +254,13 @@ class graphRAG:
 
     # clear the index
     def clear_neo4j(self):
-        self.index = None
+        try:
+            # Clear the graph store if it exists
+            if self.graph_store:
+                self.graph_store.clear()
+            self.index = None
+        except Exception as e:
+            print(f"Warning: Error clearing graph store: {str(e)}")
     
     def extract_json_from_response(self, response: str):
         # Match individual JSON objects inside brackets
@@ -305,7 +311,15 @@ async def predict(file: Annotated[UploadFile, File()], chapter_number: int = For
         path = "./"
         print(f"Received file: {file.filename}")
         print(f"Chapter number: {chapter_number}")
-        
+        # --------------------temporary code to clear the graph store ----------------------
+        try:
+            print("Cleaning up...")
+            graphrag.clear_neo4j()
+            print("Cleanup completed")
+        except Exception as e:
+            print(f"Warning: Error during cleanup: {str(e)}")
+        # ----------------------------------------------------------------------------------
+
         try:
             print("Starting model loading...")
             graphrag.load_model()
