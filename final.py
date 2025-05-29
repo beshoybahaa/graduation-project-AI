@@ -62,7 +62,7 @@ class graphRAG:
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
         self.llm_groq = Groq(
-            model="llama-3.1-8b-instant",
+            model="deepseek-r1-distill-llama-70b",
             api_key="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",
             max_retries=2
         )
