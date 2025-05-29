@@ -38,6 +38,14 @@ from llama_index.graph_stores.neo4j import Neo4jPropertyGraphStore
 # Apply nest_asyncio
 nest_asyncio.apply()
 
+# Configure global LLM settings
+llm = Groq(
+    model="llama-3.1-8b-instant",
+    api_key="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",
+    max_retries=2
+)
+Settings.llm = llm
+
 class graphRAG:
     embedding_model = None
     llm = None
@@ -264,7 +272,7 @@ async def predict(file: Annotated[UploadFile, File()], chapter_number: int = For
                     status_code=500,
                     content={
                         "error": f"Question Generation Error for {i} difficulty",
-                        "step": "prediction",
+                        "step": "QueryEngine",
                         "details": str(e)
                     }
                 )
