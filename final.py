@@ -40,7 +40,7 @@ nest_asyncio.apply()
 
 # Configure global LLM settings
 llm = Groq(
-    model="deepseek-r1-distill-llama-70b",
+    model="llama-3.3-70b-versatile",
     api_key="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",
     max_retries=2
 )
@@ -62,12 +62,12 @@ class graphRAG:
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
         self.llm_groq = Groq(
-            model="deepseek-r1-distill-llama-70b",
+            model="llama-3.3-70b-versatile",
             api_key="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",
             max_retries=2
         )
         self.llm_questions = Groq(
-            model="deepseek-r1-distill-llama-70b",
+            model="llama-3.3-70b-versatile",
             api_key="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",
             max_retries=2
         )
@@ -157,13 +157,7 @@ class graphRAG:
                 B)	Sender
                 C)	Medium
                 D)	All of the choices are correct
-            
-            2		Which of the following is not one of the characteristics of a data communication system?
-                A)	Delivery
-                B)	Accuracy
-                C)	Jitter
-                D)	All of the choices are correct
-            
+
             Please ensure that the questions reflect a deep understanding of the chapter's main ideas and concepts while varying the complexity to accommodate different levels of knowledge. Provide 40 questions for {difficulty_level} level.
             
             Begin by analyzing the chapter content thoroughly to extract key concepts, terms, and themes that can be transformed into question formats. 
