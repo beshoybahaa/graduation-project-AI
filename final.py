@@ -28,7 +28,6 @@ from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.indices.property_graph import (
     ImplicitPathExtractor,
     SimpleLLMPathExtractor,
-    GraphRAGQueryEngine,
 )
 from llama_index.core import Settings
 
@@ -113,10 +112,8 @@ class graphRAG:
         return self.index
     
     def QueryEngine(self,difficulty_level):
-        query_engine = GraphRAGQueryEngine(
-            graph_store=self.index.property_graph_store,
+        query_engine = self.index.as_query_engine(
             llm=self.llm_groq,
-            index=self.index,
             similarity_top_k=10,
         )
         response = query_engine.query(f"""You are an AI designed to generate multiple-choice questions (MCQs) based on a provided chapter of a book. Your task is to create a set of MCQs that focus on the main subject matter of the chapter. Ensure that each question is clear, concise, and relevant to the core themes of the chapter and be closed book style. Use the following structure for the MCQs:
