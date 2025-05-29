@@ -59,18 +59,30 @@ class graphRAG:
         )
 
         try:
-            # Connect to FalkorDB Docker container
+            # Connect to Neo4j with explicit APOC configuration
             self.graph_store = Neo4jGraphStore(
                 username="neo4j",
                 password="mysecret",
                 url="bolt://localhost:7687",
                 database="test",
             )
+            
+            # Test APOC availability
+            try:
+                self.graph_store.query("CALL apoc.meta.data()")
+                print("Successfully connected to Neo4j with APOC support")
+            except Exception as apoc_error:
+                print(f"APOC test failed: {str(apoc_error)}")
+                print("Please ensure the following in your Neo4j configuration:")
+                print("1. APOC plugin is installed in the plugins directory")
+                print("2. Add 'apoc.meta.data()' to the allowed procedures in neo4j.conf")
+                print("3. Restart Neo4j after making these changes")
+                raise
 
         except Exception as e:
-            print(f"Warning: Could not connect to FalkorDB: {str(e)}")
+            print(f"Warning: Could not connect to Neo4j: {str(e)}")
             print("Falling back to in-memory graph store")
-            # Fallback to in-memory graph store if FalkorDB is not available
+            # Fallback to in-memory graph store if Neo4j is not available
             self.graph_store = SimpleGraphStore()
 
         return
