@@ -224,7 +224,7 @@ async def predict(file: Annotated[UploadFile, File()], chapter_number: int = For
 
         try:
             print("Starting document loading...")
-            document = graphrag.load_doc(file, path)
+            document = graphrag.load_doc(file)
             print(f"Document loading completed. Number of documents: {len(document)}")
         except Exception as e:
             print(f"Error loading document: {str(e)}")
