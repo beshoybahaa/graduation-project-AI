@@ -1,0 +1,277 @@
+# Standard library imports
+import asyncio
+import json
+import os
+import re
+import shutil
+import tempfile
+import time
+# from datetime import datetime
+from typing import Union, Annotated
+# from math import ceil
+# from functools import partial
+
+# Third-party imports
+import nest_asyncio
+from fastapi import FastAPI, UploadFile, Form, File
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+
+# LlamaIndex imports
+from llama_index.core import VectorStoreIndex, PropertyGraphIndex, StorageContext, load_index_from_storage, SimpleDirectoryReader, Document
+from llama_index.core.graph_stores import SimpleGraphStore
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.llms.groq import Groq
+from llama_index.graph_stores.neo4j import Neo4jGraphStore
+from llama_index.core.node_parser import SentenceSplitter
+
+from llama_index.core.indices.property_graph import (
+    ImplicitPathExtractor,
+    SimpleLLMPathExtractor,
+    GraphRAGExtractor,
+    GraphRAGQueryEngine,
+)
+from llama_index.core import Settings
+
+# from llama_index.graph_stores.falkordb import FalkorDBPropertyGraphStore
+# from dotenv import load_dotenv
+
+# Apply nest_asyncio
+nest_asyncio.apply()
+
+class graphRAG:
+    embedding_model = None
+    llm = None
+    index = None
+    query_engine = None
+    graph_store = None
+    storage_context = None
+        
+    def __init__(self):
+
+        self.storage_dir = tempfile.mkdtemp()
+        self.upload_dir = tempfile.mkdtemp()
+        
+        self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
+
+        self.llm_groq = Groq(
+            model="llama-3.1-8b-instant",
+            api_key="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",
+            max_retries=2
+        )
+
+        try:
+            # Connect to FalkorDB Docker container
+            self.graph_store = Neo4jGraphStore(
+                username="neo4j",
+                password="password",
+                url="bolt://localhost:7687",
+                database="test",
+            )
+
+        except Exception as e:
+            print(f"Warning: Could not connect to FalkorDB: {str(e)}")
+            print("Falling back to in-memory graph store")
+            # Fallback to in-memory graph store if FalkorDB is not available
+            self.graph_store = SimpleGraphStore()
+
+        return
+
+    def load_doc(self, file):
+        file_path = os.path.join(self.upload_dir, file.filename)
+        
+        try:
+            # Save the uploaded file
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+            
+            # Read documents from the upload directory
+            documents = SimpleDirectoryReader(self.upload_dir).load_data()
+            return documents
+        except Exception as e:
+            print(f"Error loading document: {str(e)}")
+            raise
+
+    def index_doc(self, doc):
+        splitter = SentenceSplitter(
+            chunk_size=1024,
+            chunk_overlap=200,
+        )
+        nodes = splitter.get_nodes_from_documents(doc)
+
+        kg_extractor = GraphRAGExtractor(
+            llm=self.llm_groq,
+            max_paths_per_chunk=2,
+        )
+
+        self.index = PropertyGraphIndex(
+            nodes=nodes,
+            kg_extractors=[kg_extractor],
+            property_graph_store=self.graph_store,
+            show_progress=True,
+        )
+
+        return self.index
+    
+    def QueryEngine(self,difficulty_level):
+        query_engine = GraphRAGQueryEngine(
+            graph_store=self.index.property_graph_store,
+            llm=self.llm_groq,
+            index=self.index,
+            similarity_top_k=10,
+        )
+        response = query_engine.query(f"""You are an AI designed to generate multiple-choice questions (MCQs) based on a provided chapter of a book. Your task is to create a set of MCQs that focus on the main subject matter of the chapter. Ensure that each question is clear, concise, and relevant to the core themes of the chapter and be closed book style. Use the following structure for the MCQs:
+            
+            1. **Question Statement**: A clear and precise question related to the chapter content.
+            2. **Answer Choices**: Four options labeled A, B, C, and D, where only one option is correct. The incorrect options should be plausible to challenge the reader's knowledge.
+            3. **Correct Answer**: give me the correct answer of the question
+            examples for questions : 
+            1		Which of the following is not one of the components of a data communication system?
+                A)	Message
+                B)	Sender
+                C)	Medium
+                D)	All of the choices are correct
+            
+            2		Which of the following is not one of the characteristics of a data communication system?
+                A)	Delivery
+                B)	Accuracy
+                C)	Jitter
+                D)	All of the choices are correct
+            
+            Please ensure that the questions reflect a deep understanding of the chapter's main ideas and concepts while varying the complexity to accommodate different levels of knowledge. Provide 40 questions for {difficulty_level} level.
+            
+            Begin by analyzing the chapter content thoroughly to extract key concepts, terms, and themes that can be transformed into question formats. 
+            
+            and make the output form in json form like thie example : 
+            {{
+            "question":"Which of the following is not one of the characteristics of a data communication system?",
+            "answerA":"Delivery",
+            "answerB":"Accuracy",
+            "answerC":"Jitter",
+            "answerD":"All of the choices are correct",
+            "correctAnswer":"answerD"
+            }}""")
+        return response
+    
+    def extract_json_from_response(self, response: str):
+        # Match individual JSON objects inside brackets
+        object_matches = re.findall(r'{[^{}]*?(?:"[^"]*":\s*"[^"]*?",?)*[^{}]*?}', response, re.DOTALL)
+    
+        valid_objects = []
+        for obj_str in object_matches:
+            try:
+                obj = json.loads(obj_str)
+                valid_objects.append(obj)
+            except json.JSONDecodeError:
+                continue  # Skip invalid or incomplete objects
+    
+        return valid_objects
+        
+    def add_to_json(self, json_data, difficulty_str, chapter_number):
+        # Map string to integer values
+        difficulty_map = {
+            "easy": 1,
+            "medium": 2,
+            "hard": 3
+        }
+    
+        # Get the corresponding numeric value
+        difficulty_value = difficulty_map.get(difficulty_str.lower(), 1)  # default to 0 if not found
+    
+        for item in json_data:
+            item["difficulty"] = difficulty_value
+            item["chapterNo"] = chapter_number
+    
+        return json_data
+
+
+app = FastAPI()
+
+# create the graphRAG object
+graphrag = graphRAG()
+
+# get request
+@app.get('/')
+def index():
+    return {'message': 'Quizaty API!'}
+
+
+# post request that takes a review (text type) and returns a sentiment score
+@app.post('/questions')
+async def predict(file: Annotated[UploadFile, File()], chapter_number: int = Form(1)):
+    try:
+        path = "./"
+        print(f"Received file: {file.filename}")
+        print(f"Chapter number: {chapter_number}")
+        # --------------------temporary code to clear the graph store ----------------------
+        try:
+            print("Cleaning up...")
+            graphrag.clear_neo4j()
+            print("Cleanup completed")
+        except Exception as e:
+            print(f"Warning: Error during cleanup: {str(e)}")
+        # ----------------------------------------------------------------------------------
+
+        try:
+            print("Starting document loading...")
+            document = graphrag.load_doc(file, path)
+            print(f"Document loading completed. Number of documents: {len(document)}")
+        except Exception as e:
+            print(f"Error loading document: {str(e)}")
+            return JSONResponse(
+                status_code=500,
+                content={"error": "Document Loading Error", "step": "load_doc", "details": str(e)}
+            )
+
+        try:
+            print("Starting document indexing...")
+            await graphrag.index_doc(document, path)
+            print("Document indexing completed")
+        except Exception as e:
+            print(f"Error indexing document: {str(e)}")
+            return JSONResponse(
+                status_code=500,
+                content={"error": "Document Indexing Error", "step": "index_doc", "details": str(e)}
+            )
+
+        json_data_all = []
+        for i in ["easy", "medium", "hard"]:
+            try:
+                print(f"Generating questions for {i} difficulty...")
+                test = await graphrag.QueryEngine(i)
+                print(f"Generated {i} difficulty questions")
+                response_answer = str(test)
+                json_data = graphrag.extract_json_from_response(response_answer)
+                print(f"Extracted {len(json_data)} questions from response")
+                json_data = graphrag.add_to_json(json_data, i, chapter_number)
+                json_data_all.extend(json_data)
+                print(f"Completed {i} difficulty level")
+                time.sleep(3)
+            except Exception as e:
+                print(f"Error generating {i} difficulty questions: {str(e)}")
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "error": f"Question Generation Error for {i} difficulty",
+                        "step": "prediction",
+                        "details": str(e)
+                    }
+                )
+        # try:
+        #     print("Cleaning up...")
+        #     graphrag.clear_neo4j()
+        #     print("Cleanup completed")
+        # except Exception as e:
+        #     print(f"Warning: Error during cleanup: {str(e)}")
+            
+        # print(f"Successfully generated {len(json_data_all)} total questions")
+        # return JSONResponse(content=json_data_all)
+        
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Unexpected Error", "step": "general", "details": str(e)}
+        )
+
+    
