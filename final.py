@@ -118,7 +118,7 @@ class graphRAG:
 
         self.index = PropertyGraphIndex(
             nodes=nodes,
-            llm=self.llm_groq,
+            embedding_model=self.embedding_model,
             kg_extractors=[kg_extractor],
             property_graph_store=self.graph_store,
             show_progress=True,
