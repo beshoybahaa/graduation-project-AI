@@ -59,6 +59,7 @@ class graphRAG:
         )
 
         try:
+            print("Attempting to connect to Neo4j...")
             # Connect to Neo4j with explicit APOC configuration
             self.graph_store = Neo4jGraphStore(
                 username="neo4j",
@@ -67,16 +68,38 @@ class graphRAG:
                 database="test",
             )
             
-            # Test APOC availability
+            # Test basic Neo4j connection first
             try:
-                self.graph_store.query("CALL apoc.meta.data()")
-                print("Successfully connected to Neo4j with APOC support")
+                self.graph_store.query("RETURN 1")
+                print("Basic Neo4j connection successful")
+            except Exception as basic_error:
+                print(f"Basic Neo4j connection failed: {str(basic_error)}")
+                raise
+            
+            # Test APOC availability with a simpler procedure
+            try:
+                self.graph_store.query("CALL apoc.help('apoc')")
+                print("APOC connection successful")
             except Exception as apoc_error:
                 print(f"APOC test failed: {str(apoc_error)}")
-                print("Please ensure the following in your Neo4j configuration:")
-                print("1. APOC plugin is installed in the plugins directory")
-                print("2. Add 'apoc.meta.data()' to the allowed procedures in neo4j.conf")
-                print("3. Restart Neo4j after making these changes")
+                print("\nTroubleshooting steps:")
+                print("1. Verify Neo4j container is running:")
+                print("   docker ps | grep neo4j")
+                print("\n2. Check Neo4j logs:")
+                print("   docker logs neo4j-apoc")
+                print("\n3. Verify APOC plugin is installed:")
+                print("   docker exec neo4j-apoc ls /plugins")
+                print("\n4. Check Neo4j configuration:")
+                print("   docker exec neo4j-apoc cat /conf/neo4j.conf | grep apoc")
+                print("\n5. Restart Neo4j with correct configuration:")
+                print("   docker stop neo4j-apoc")
+                print("   docker rm neo4j-apoc")
+                print("   docker run -d --name neo4j-apoc -p 7474:7474 -p 7687:7687 \\")
+                print("   -e NEO4J_AUTH=neo4j/mysecret \\")
+                print("   -e NEO4J_PLUGINS='[\"apoc\"]' \\")
+                print("   -e NEO4J_dbms_security_procedures_unrestricted=apoc.* \\")
+                print("   -e NEO4J_dbms_security_procedures_allowlist=apoc.* \\")
+                print("   neo4j:latest")
                 raise
 
         except Exception as e:
