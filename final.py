@@ -40,7 +40,7 @@ nest_asyncio.apply()
 
 # Configure global LLM settings
 llm = Groq(
-    model="llama-3.1-8b-instant",
+    model="llama-3.3-70b-versatile",
     api_key="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",
     max_retries=2
 )
