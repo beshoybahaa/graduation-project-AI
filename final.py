@@ -249,7 +249,7 @@ async def predict(file: Annotated[UploadFile, File()], chapter_number: int = For
         for i in ["easy", "medium", "hard"]:
             try:
                 print(f"Generating questions for {i} difficulty...")
-                test =graphrag.QueryEngine(i)
+                test = await graphrag.QueryEngine(i)
                 print(f"Generated {i} difficulty questions")
                 response_answer = str(test)
                 json_data = graphrag.extract_json_from_response(response_answer)
