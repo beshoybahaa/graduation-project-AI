@@ -139,39 +139,64 @@ class graphRAG:
 
         return self.index
     
-    def QueryEngine(self,difficulty_level):
+    def QueryEngine(self, difficulty_level, num_parts=2):
+        # Get all nodes from the graph store
+        all_nodes = self.graph_store.query("MATCH (n) RETURN n")
+        total_nodes = len(all_nodes)
+        
+        # Split nodes into specified number of parts
+        part_size = total_nodes // num_parts
+        node_parts = [all_nodes[i:i + part_size] for i in range(0, total_nodes, part_size)]
+        
+        all_questions = []
+        questions_per_part = 40 // num_parts  # Distribute questions evenly
+        
+        # Create query engine
         query_engine = self.index.as_query_engine(
             llm=self.llm_questions,
             show_progress=True,
             storage_context=self.index.storage_context,
-            include_text=True,  # Include the text in the response
+            include_text=True,
         )
-        response = query_engine.query(f"""You are an AI designed to generate multiple-choice questions (MCQs) based on a provided chapter of a book. Your task is to create a set of MCQs that focus on the main subject matter of the chapter. Ensure that each question is clear, concise, and relevant to the core themes of the chapter and be closed book style. Use the following structure for the MCQs:
-            
-            1. **Question Statement**: A clear and precise question related to the chapter content.
-            2. **Answer Choices**: Four options labeled A, B, C, and D, where only one option is correct. The incorrect options should be plausible to challenge the reader's knowledge.
-            3. **Correct Answer**: give me the correct answer of the question
-            examples for questions : 
-            1		Which of the following is not one of the components of a data communication system?
-                A)	Message
-                B)	Sender
-                C)	Medium
-                D)	All of the choices are correct
+        
+        try:
+            for i, part_nodes in enumerate(node_parts):
+                print(f"Generating questions from part {i+1} for {difficulty_level}...")
+                part_context = "\n".join([node['n']['text'] for node in part_nodes])
+                part_query = f"""You are an AI designed to generate multiple-choice questions (MCQs) based on the following content from part {i+1} of a chapter:
 
-            Please ensure that the questions reflect a deep understanding of the chapter's main ideas and concepts while varying the complexity to accommodate different levels of knowledge. Provide 40 questions for {difficulty_level} level.
+                {part_context}
+
+                Generate {questions_per_part} questions for {difficulty_level} level based on this specific part of the content. Use the following structure:
+                
+                1. **Question Statement**: A clear and precise question related to this part of the chapter.
+                2. **Answer Choices**: Four options labeled A, B, C, and D.
+                3. **Correct Answer**: The correct answer label.
+                
+                Format each question in JSON:
+                {{
+                    "question": "Question text",
+                    "answerA": "Option A",
+                    "answerB": "Option B",
+                    "answerC": "Option C",
+                    "answerD": "Option D",
+                    "correctAnswer": "answerX"
+                }}"""
+                
+                part_response = query_engine.query(part_query)
+                part_questions = self.extract_json_from_response(str(part_response))
+                all_questions.extend(part_questions)
+                
+                # Add delay between parts
+                if i < len(node_parts) - 1:  # Don't delay after the last part
+                    time.sleep(2)
             
-            Begin by analyzing the chapter content thoroughly to extract key concepts, terms, and themes that can be transformed into question formats. 
+            print(f"Generated total of {len(all_questions)} questions for {difficulty_level}")
+            return all_questions
             
-            and make the output form in json form like thie example : 
-            {{
-            "question":"Which of the following is not one of the characteristics of a data communication system?",
-            "answerA":"Delivery",
-            "answerB":"Accuracy",
-            "answerC":"Jitter",
-            "answerD":"All of the choices are correct",
-            "correctAnswer":"answerD"
-            }}""")
-        return response
+        except Exception as e:
+            print(f"Error generating questions: {str(e)}")
+            raise
     
     def extract_json_from_response(self, response: str):
         # Match individual JSON objects inside brackets
