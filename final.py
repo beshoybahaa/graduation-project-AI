@@ -62,12 +62,12 @@ class graphRAG:
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
         self.llm_groq = Groq(
-            model="deepseek-r1-distill-llama-70b",
+            model="gemma2-9b-it",
             api_key="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",
             max_retries=2
         )
         self.llm_questions = Groq(
-            model="deepseek-r1-distill-llama-70b",
+            model="llama-3.3-70b-versatile",
             api_key="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",
             max_retries=2
         )
