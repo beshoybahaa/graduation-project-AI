@@ -62,7 +62,7 @@ class graphRAG:
             # Connect to FalkorDB Docker container
             self.graph_store = Neo4jGraphStore(
                 username="neo4j",
-                password="password",
+                password="mysecret",
                 url="bolt://localhost:7687",
                 database="test",
             )
