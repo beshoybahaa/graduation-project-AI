@@ -75,6 +75,16 @@ class graphRAG:
 
         return
 
+    def clear_neo4j(self):
+        """Clear all nodes and relationships from the Neo4j database."""
+        try:
+            # Use APOC to clear the database
+            self.graph_store.query("CALL apoc.periodic.iterate('MATCH (n) RETURN n', 'DETACH DELETE n', {batchSize: 1000})")
+            print("Successfully cleared Neo4j database")
+        except Exception as e:
+            print(f"Error clearing Neo4j database: {str(e)}")
+            raise
+
     def load_doc(self, file):
         file_path = os.path.join(self.upload_dir, file.filename)
         
