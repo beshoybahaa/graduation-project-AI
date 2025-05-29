@@ -28,7 +28,6 @@ from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.indices.property_graph import (
     ImplicitPathExtractor,
     SimpleLLMPathExtractor,
-    GraphRAGExtractor,
     GraphRAGQueryEngine,
 )
 from llama_index.core import Settings
@@ -99,7 +98,7 @@ class graphRAG:
         )
         nodes = splitter.get_nodes_from_documents(doc)
 
-        kg_extractor = GraphRAGExtractor(
+        kg_extractor = SimpleLLMPathExtractor(
             llm=self.llm_groq,
             max_paths_per_chunk=2,
         )
