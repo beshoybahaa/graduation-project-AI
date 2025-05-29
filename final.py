@@ -114,14 +114,14 @@ class graphRAG:
 
     def index_doc(self, doc):
         splitter = SentenceSplitter(
-            chunk_size=1024,
-            chunk_overlap=200,
+            chunk_size=300,
+            chunk_overlap=90,
         )
         nodes = splitter.get_nodes_from_documents(doc)
 
         kg_extractor = SimpleLLMPathExtractor(
             llm=self.llm_groq,
-            max_paths_per_chunk=2,
+            # max_paths_per_chunk=2,
         )
 
         self.index = PropertyGraphIndex(
@@ -137,7 +137,7 @@ class graphRAG:
     def QueryEngine(self,difficulty_level):
         query_engine = self.index.as_query_engine(
             llm=self.llm_groq,
-            similarity_top_k=10,
+            similarity_top_k=5
         )
         response = query_engine.query(f"""You are an AI designed to generate multiple-choice questions (MCQs) based on a provided chapter of a book. Your task is to create a set of MCQs that focus on the main subject matter of the chapter. Ensure that each question is clear, concise, and relevant to the core themes of the chapter and be closed book style. Use the following structure for the MCQs:
             
