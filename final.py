@@ -236,7 +236,7 @@ async def predict(file: Annotated[UploadFile, File()], chapter_number: int = For
 
         try:
             print("Starting document indexing...")
-            await graphrag.index_doc(document)
+            graphrag.index_doc(document)
             print("Document indexing completed")
         except Exception as e:
             print(f"Error indexing document: {str(e)}")
