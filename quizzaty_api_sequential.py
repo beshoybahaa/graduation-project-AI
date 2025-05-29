@@ -184,27 +184,21 @@ class graphRAG:
         # Create storage context with the graph store
         storage_context = StorageContext.from_defaults(graph_store=self.graph_store)
         
-        # Configure text splitter for better chunking
-        text_splitter = TokenTextSplitter(
-            chunk_size=1000,  # Reduced chunk size
-            chunk_overlap=200,  # Reduced overlap
-            separator="\n"
-        )
-        
-        # Configure path extractor for graph construction
-        path_extractor = SimpleLLMPathExtractor(
-            llm=self.llm_groq,
-            max_paths_per_chunk=60  # Limit the number of paths extracted per chunk
-        )
+        # # Configure text splitter for better chunking
+        # text_splitter = TokenTextSplitter(
+        #     chunk_size=1000,  # Reduced chunk size
+        #     chunk_overlap=200,  # Reduced overlap
+        #     separator="\n"
+        # )
         
         self.index = PropertyGraphIndex.from_documents(
-            doc,
-            llm=self.llm_groq,
+            doc, 
             embed_model=self.embedding_model,
+            llm=self.llm_groq,
             storage_context=storage_context,
             show_progress=True,
-            text_splitter=text_splitter,
-            path_extractor=path_extractor
+            # text_splitter=text_splitter,
+            # path_extractor=path_extractor
         )
         return self.index
 
