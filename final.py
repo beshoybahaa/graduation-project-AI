@@ -144,22 +144,37 @@ class graphRAG:
             llm=self.llm_questions,
             show_progress=True
         )
-        response = query_engine.query(f"""Generate {difficulty_level} level multiple-choice questions based on the chapter content. Each question should have:
-            1. A clear question statement
-            2. Four options (A, B, C, D)
-            3. The correct answer
+        response = query_engine.query(f"""You are an AI designed to generate multiple-choice questions (MCQs) based on a provided chapter of a book. Your task is to create a set of MCQs that focus on the main subject matter of the chapter. Ensure that each question is clear, concise, and relevant to the core themes of the chapter and be closed book style. Use the following structure for the MCQs:
             
-            Format each question as JSON:
+            1. **Question Statement**: A clear and precise question related to the chapter content.
+            2. **Answer Choices**: Four options labeled A, B, C, and D, where only one option is correct. The incorrect options should be plausible to challenge the reader's knowledge.
+            3. **Correct Answer**: give me the correct answer of the question
+            examples for questions : 
+            1		Which of the following is not one of the components of a data communication system?
+                A)	Message
+                B)	Sender
+                C)	Medium
+                D)	All of the choices are correct
+            
+            2		Which of the following is not one of the characteristics of a data communication system?
+                A)	Delivery
+                B)	Accuracy
+                C)	Jitter
+                D)	All of the choices are correct
+            
+            Please ensure that the questions reflect a deep understanding of the chapter's main ideas and concepts while varying the complexity to accommodate different levels of knowledge. Provide 40 questions for {difficulty_level} level.
+            
+            Begin by analyzing the chapter content thoroughly to extract key concepts, terms, and themes that can be transformed into question formats. 
+            
+            and make the output form in json form like thie example : 
             {{
-            "question":"Question text",
-            "answerA":"Option A",
-            "answerB":"Option B",
-            "answerC":"Option C",
-            "answerD":"Option D",
-            "correctAnswer":"answerX"
-            }}
-            
-            Generate 40 questions for {difficulty_level} level.""")
+            "question":"Which of the following is not one of the characteristics of a data communication system?",
+            "answerA":"Delivery",
+            "answerB":"Accuracy",
+            "answerC":"Jitter",
+            "answerD":"All of the choices are correct",
+            "correctAnswer":"answerD"
+            }}""")
         return response
     
     def extract_json_from_response(self, response: str):
