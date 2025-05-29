@@ -40,7 +40,7 @@ nest_asyncio.apply()
 
 # Configure global LLM settings
 llm = Groq(
-    model="llama-3.3-70b-versatile",
+    model="deepseek-r1-distill-llama-70b",
     api_key="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",
     max_retries=2
 )
@@ -62,12 +62,12 @@ class graphRAG:
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
         self.llm_groq = Groq(
-            model="llama-3.3-70b-versatile",
+            model="deepseek-r1-distill-llama-70b",
             api_key="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",
             max_retries=2
         )
         self.llm_questions = Groq(
-            model="llama-3.3-70b-versatile",
+            model="deepseek-r1-distill-llama-70b",
             api_key="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",
             max_retries=2
         )
