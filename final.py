@@ -139,12 +139,12 @@ class graphRAG:
 
         return self.index
     
-    def QueryEngine(self,difficulty_level):
+    def QueryEngine(self, difficulty_level):
         query_engine = self.index.as_query_engine(
             llm=self.llm_questions,
             show_progress=True,
             storage_context=self.index.storage_context,
-            include_text=True,  # Include the text in the response
+            include_text=True,
         )
         response = query_engine.query(f"""You are an AI designed to generate multiple-choice questions (MCQs) based on a provided chapter of a book. Your task is to create a set of MCQs that focus on the main subject matter of the chapter. Ensure that each question is clear, concise, and relevant to the core themes of the chapter and be closed book style. Use the following structure for the MCQs:
             
@@ -158,7 +158,7 @@ class graphRAG:
                 C)	Medium
                 D)	All of the choices are correct
 
-            Please ensure that the questions reflect a deep understanding of the chapter's main ideas and concepts while varying the complexity to accommodate different levels of knowledge. Provide 40 questions for {difficulty_level} level.
+            Please ensure that the questions reflect a deep understanding of the chapter's main ideas and concepts while varying the complexity to accommodate different levels of knowledge. Provide 15 questions for {difficulty_level} level.
             
             Begin by analyzing the chapter content thoroughly to extract key concepts, terms, and themes that can be transformed into question formats. 
             
@@ -258,15 +258,15 @@ async def predict(file: Annotated[UploadFile, File()], chapter_number: int = For
         for i in ["easy", "medium", "hard"]:
             try:
                 print(f"Generating questions for {i} difficulty...")
-                test = graphrag.QueryEngine(i)
-                print(f"Generated {i} difficulty questions")
-                response_answer = str(test)
-                json_data = graphrag.extract_json_from_response(response_answer)
-                print(f"Extracted {len(json_data)} questions from response")
-                json_data = graphrag.add_to_json(json_data, i, chapter_number)
-                json_data_all.extend(json_data)
+                # Make multiple calls to get 40 questions total
+                for batch in range(3):  # This will generate 15 questions per batch, 3 batches = 45 questions
+                    test = graphrag.QueryEngine(i)
+                    response_answer = str(test)
+                    json_data = graphrag.extract_json_from_response(response_answer)
+                    json_data = graphrag.add_to_json(json_data, i, chapter_number)
+                    json_data_all.extend(json_data)
+                    time.sleep(3)  # Add delay between batches
                 print(f"Completed {i} difficulty level")
-                time.sleep(3)
             except Exception as e:
                 print(f"Error generating {i} difficulty questions: {str(e)}")
                 return JSONResponse(
@@ -277,12 +277,6 @@ async def predict(file: Annotated[UploadFile, File()], chapter_number: int = For
                         "details": str(e)
                     }
                 )
-        # try:
-        #     print("Cleaning up...")
-        #     graphrag.clear_neo4j()
-        #     print("Cleanup completed")
-        # except Exception as e:
-        #     print(f"Warning: Error during cleanup: {str(e)}")
             
         print(f"Successfully generated {len(json_data_all)} total questions")
         return JSONResponse(content=json_data_all)
