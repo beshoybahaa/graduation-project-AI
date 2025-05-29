@@ -290,8 +290,8 @@ async def predict(file: Annotated[UploadFile, File()], chapter_number: int = For
         # except Exception as e:
         #     print(f"Warning: Error during cleanup: {str(e)}")
             
-        # print(f"Successfully generated {len(json_data_all)} total questions")
-        # return JSONResponse(content=json_data_all)
+        print(f"Successfully generated {len(json_data_all)} total questions")
+        return JSONResponse(content=json_data_all)
         
     except Exception as e:
         print(f"Unexpected error: {str(e)}")
