@@ -64,8 +64,7 @@ class graphRAG:
             self.graph_store = Neo4jGraphStore(
                 username="neo4j",
                 password="mysecret",
-                url="bolt://localhost:7687",
-                database="test",
+                url="bolt://0.0.0.0:7687",
             )
             
             # Test basic Neo4j connection first
