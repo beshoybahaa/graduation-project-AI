@@ -112,6 +112,7 @@ class graphRAG:
                     time.sleep(5)
                     system_driver.close()
                 else:
+                    print("Database already exists")
                     found = True
 
                 print("Attempting to connect to Neo4j...")
