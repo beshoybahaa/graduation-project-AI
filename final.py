@@ -81,18 +81,34 @@ class graphRAG:
         }
         
         try:
-            # Create a temporary Neo4j database for this session
+            # First create a connection to the system database
+            system_store = Neo4jPropertyGraphStore(
+                username="neo4j",
+                password="mysecret",
+                url="bolt://0.0.0.0:7687",
+                database="system"  # Connect to system database first
+            )
+            
+            # Create the temporary database
+            with system_store._driver.session() as neo4j_session:
+                neo4j_session.run(f"CREATE DATABASE temp_{session_id} IF NOT EXISTS")
+                # Wait for the database to be ready
+                neo4j_session.run("CALL dbms.waitForDatabase('temp_" + session_id + "')")
+            
+            # Close the system connection
+            system_store._driver.close()
+            
+            # Now connect to the newly created database
             session['graph_store'] = Neo4jPropertyGraphStore(
                 username="neo4j",
                 password="mysecret",
                 url="bolt://0.0.0.0:7687",
-                database=f"temp_{session_id}"  # Create a unique database name
+                database=f"temp_{session_id}"
             )
             
-            # Initialize the temporary database
+            # Verify the connection
             with session['graph_store']._driver.session() as neo4j_session:
-                neo4j_session.run(f"CREATE DATABASE temp_{session_id}")
-                neo4j_session.run(f"USE temp_{session_id}")
+                neo4j_session.run("RETURN 1")
                 
         except Exception as e:
             print(f"Warning: Could not create temporary Neo4j database: {str(e)}")
@@ -112,8 +128,19 @@ class graphRAG:
             # Clean up temporary Neo4j database if it exists
             if session['graph_store'] and isinstance(session['graph_store'], Neo4jPropertyGraphStore):
                 try:
-                    with session['graph_store']._driver.session() as neo4j_session:
-                        neo4j_session.run(f"DROP DATABASE temp_{session['session_id']}")
+                    # Connect to system database to drop the temporary database
+                    system_store = Neo4jPropertyGraphStore(
+                        username="neo4j",
+                        password="mysecret",
+                        url="bolt://0.0.0.0:7687",
+                        database="system"
+                    )
+                    
+                    with system_store._driver.session() as neo4j_session:
+                        neo4j_session.run(f"DROP DATABASE temp_{session['session_id']} IF EXISTS")
+                    
+                    # Close both connections
+                    system_store._driver.close()
                     session['graph_store']._driver.close()
                 except Exception as e:
                     print(f"Error cleaning up Neo4j database: {str(e)}")
