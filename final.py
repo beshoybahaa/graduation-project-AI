@@ -87,10 +87,12 @@ class graphRAG:
                 databases = [record["name"] for record in result]
                 print(f"Available databases: {databases}")
                 
-                if "neo4j" not in databases:
+                if "neo4j-book" not in databases:
                     print("Creating neo4j database...")
-                    session.run("CREATE DATABASE neo4j")
+                    session.run("CREATE DATABASE neo4j-book")
                     print("Database created successfully")
+                    # Wait for database to be ready
+                    time.sleep(5)
             
             system_driver.close()
             
@@ -99,7 +101,7 @@ class graphRAG:
                 username="neo4j",
                 password="mysecret",
                 url="bolt://0.0.0.0:7687",
-                database=databases[1]
+                database="neo4j-book"  # Explicitly specify the database name
             )
         except Exception as e:
             print(f"Warning: Could not connect to Neo4j: {str(e)}")
