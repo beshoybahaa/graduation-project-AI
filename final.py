@@ -92,6 +92,7 @@ class graphRAG:
         from uuid import uuid4
 
         request_id = str(uuid4())
+        request_id = f"db_{str(raw_uuid).replace('-', '')}"
 
         system_driver = GraphDatabase.driver(
                 "bolt://0.0.0.0:7687",
