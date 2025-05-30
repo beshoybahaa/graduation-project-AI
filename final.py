@@ -55,11 +55,7 @@ class graphRAG:
     storage_context = None
         
     def __init__(self):
-        self.storage_dir = tempfile.mkdtemp()
-        self.upload_dir = tempfile.mkdtemp()
-        
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
-
         self.llm_groq = Groq(
             model="deepseek-r1-distill-llama-70b",
             api_key="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",
@@ -70,73 +66,42 @@ class graphRAG:
             api_key="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",
             max_retries=2
         )
-        
-        return
 
-    def get_or_create_graph_store(self, book_name: str, chapter_number: int):
-        """Create or get an existing graph store for a specific book and chapter."""
-        # Replace spaces with underscores in book name
-        sanitized_book_name = book_name.replace(" ", "_")
-        if "(" in sanitized_book_name:
-            sanitized_book_name = sanitized_book_name.replace("(", "")
-        if ")" in sanitized_book_name:
-            sanitized_book_name = sanitized_book_name.replace(")", "")
-        sanitized_book_name = sanitized_book_name.replace(".pdf", "")
-        # Convert to camel case
-        words = sanitized_book_name.split('_')
-        sanitized_book_name = words[0].lower() + ''.join(word.capitalize() for word in words[1:])
-        graph_name = f"{sanitized_book_name}Chapter{chapter_number}"
-        
         try:
-            print("Checking available Neo4j databases...")
-            from neo4j import GraphDatabase
-            
-            # First connect to system database to list available databases
-            system_driver = GraphDatabase.driver(
-                "bolt://0.0.0.0:7687",
-                auth=("neo4j", "mysecret")
+            print("Attempting to connect to Neo4j...")
+            self.graph_store = Neo4jPropertyGraphStore(
+                username="neo4j",
+                password="mysecret",
+                url="bolt://0.0.0.0:7687",
             )
-            
-            with system_driver.session(database="system") as session:
-                result = session.run("SHOW DATABASES")
-                databases = [record["name"] for record in result]
-                print(f"Available databases: {databases}")
-                
-                found = False
-
-                if graph_name.lower() not in [db.lower() for db in databases]:
-                    print("Creating neo4j database...")
-                    session.run(f"CREATE DATABASE {graph_name}")
-                    print("Database created successfully")
-                    # Wait for database to be ready
-                    time.sleep(5)
-                    system_driver.close()
-                else:
-                    print("Database already exists")
-                    found = True
-
-                print("Attempting to connect to Neo4j...")
-                self.base_graph_store = Neo4jPropertyGraphStore(
-                    username="neo4j",
-                    password="mysecret",
-                    url="bolt://0.0.0.0:7687",
-                    database=graph_name  # Explicitly specify the database name
-                )
-            if found == True:
-                return True
-            else:
-                return self.base_graph_store
-                
         except Exception as e:
-            print(f"Error managing graph store: {str(e)}")
-            # Fallback to in-memory graph store
-            self.storage_context = SimpleGraphStore()
-            return None
+            print(f"Warning: Could not connect to Neo4j: {str(e)}")
+            print("Falling back to in-memory graph store")
+            self.graph_store = SimpleGraphStore()
 
-    def clear_neo4j(self):
+    async def create_session(self):
+        """Create a new processing session with isolated storage."""
+        session = {
+            'storage_dir': tempfile.mkdtemp(),
+            'upload_dir': tempfile.mkdtemp(),
+            'index': None,
+            'storage_context': None
+        }
+        return session
+
+    async def cleanup_session(self, session):
+        """Clean up a processing session."""
+        try:
+            if os.path.exists(session['storage_dir']):
+                shutil.rmtree(session['storage_dir'])
+            if os.path.exists(session['upload_dir']):
+                shutil.rmtree(session['upload_dir'])
+        except Exception as e:
+            print(f"Error cleaning up session: {str(e)}")
+
+    async def clear_neo4j(self):
         """Clear all nodes and relationships from the Neo4j database."""
         try:
-            # Get the Neo4j client from the graph store and execute a clear command
             with self.graph_store._driver.session() as session:
                 session.run("MATCH (n) DETACH DELETE n")
             print("Successfully cleared Neo4j database")
@@ -144,47 +109,20 @@ class graphRAG:
             print(f"Error clearing Neo4j database: {str(e)}")
             raise
 
-    def reset_system(self):
-        """Reset the entire system to ensure no old data remains."""
-        try:
-            # Clear the Neo4j database
-            self.clear_neo4j()
-            
-            # Reset the index and storage context
-            self.index = None
-            self.storage_context = None
-            
-            # Clear temporary directories
-            if os.path.exists(self.storage_dir):
-                shutil.rmtree(self.storage_dir)
-            if os.path.exists(self.upload_dir):
-                shutil.rmtree(self.upload_dir)
-            
-            # Create fresh temporary directories
-            self.storage_dir = tempfile.mkdtemp()
-            self.upload_dir = tempfile.mkdtemp()
-            
-            print("Successfully reset the entire system")
-        except Exception as e:
-            print(f"Error resetting system: {str(e)}")
-            raise
-
-    def load_doc(self, file):
-        file_path = os.path.join(self.upload_dir, file.filename)
+    async def load_doc(self, file, session):
+        file_path = os.path.join(session['upload_dir'], file.filename)
         
         try:
-            # Save the uploaded file
             with open(file_path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
             
-            # Read documents from the upload directory
-            documents = SimpleDirectoryReader(self.upload_dir).load_data()
+            documents = SimpleDirectoryReader(session['upload_dir']).load_data()
             return documents
         except Exception as e:
             print(f"Error loading document: {str(e)}")
             raise
 
-    def index_doc(self, doc):
+    async def index_doc(self, doc, session):
         splitter = SentenceSplitter(
             chunk_size=500,
             chunk_overlap=150,
@@ -193,10 +131,9 @@ class graphRAG:
 
         kg_extractor = SimpleLLMPathExtractor(
             llm=self.llm_groq,
-            # max_paths_per_chunk=2,
         )
 
-        self.index = PropertyGraphIndex(
+        session['index'] = PropertyGraphIndex(
             nodes=nodes,
             embed_model=self.embedding_model,
             kg_extractors=[kg_extractor],
@@ -204,51 +141,13 @@ class graphRAG:
             show_progress=True,
         )
 
-        return self.index
+        return session['index']
     
-    def QueryEngine(self, difficulty_level):
-        query_engine = self.index.as_query_engine(
+    async def QueryEngine(self, difficulty_level, session):
+        query_engine = session['index'].as_query_engine(
             llm=self.llm_questions,
             show_progress=True,
-            storage_context=self.index.storage_context,
-            include_text=True,
-        )
-        response = query_engine.query(f"""You are an AI designed to generate multiple-choice questions (MCQs) based on a provided chapter of a book. Your task is to create a set of MCQs that focus on the main subject matter of the chapter. Ensure that each question is clear, concise, and relevant to the core themes of the chapter and be closed book style. Use the following structure for the MCQs:
-            
-            1. **Question Statement**: A clear and precise question related to the chapter content.
-            2. **Answer Choices**: Four options labeled A, B, C, and D, where only one option is correct. The incorrect options should be plausible to challenge the reader's knowledge.
-            3. **Correct Answer**: give me the correct answer of the question
-            examples for questions : 
-            1		Which of the following is not one of the components of a data communication system?
-                A)	Message
-                B)	Sender
-                C)	Medium
-                D)	All of the choices are correct
-
-            Please ensure that the questions reflect a deep understanding of the chapter's main ideas and concepts while varying the complexity to accommodate different levels of knowledge. Provide 15 questions for {difficulty_level} level.
-            
-            Begin by analyzing the chapter content thoroughly to extract key concepts, terms, and themes that can be transformed into question formats. 
-            
-            and make the output form in json form like thie example : 
-            {{
-            "question":"Which of the following is not one of the characteristics of a data communication system?",
-            "answerA":"Delivery",
-            "answerB":"Accuracy",
-            "answerC":"Jitter",
-            "answerD":"All of the choices are correct",
-            "correctAnswer":"answerD"
-            }}""")
-        return response
-
-    def QueryEngine_from_existing(self, difficulty_level, storage_context):
-        self.index = PropertyGraphIndex.from_existing(
-            property_graph_store=storage_context,  # Use storage_context directly as it's already a Neo4jPropertyGraphStore
-            embed_model=self.embedding_model
-        )
-        query_engine = self.index.as_query_engine(
-            llm=self.llm_questions,
-            show_progress=True,
-            storage_context=self.index.storage_context,
+            storage_context=session['index'].storage_context,
             include_text=True,
         )
         response = query_engine.query(f"""You are an AI designed to generate multiple-choice questions (MCQs) based on a provided chapter of a book. Your task is to create a set of MCQs that focus on the main subject matter of the chapter. Ensure that each question is clear, concise, and relevant to the core themes of the chapter and be closed book style. Use the following structure for the MCQs:
@@ -325,73 +224,50 @@ def index():
 @app.post('/questions')
 async def predict(file: Annotated[UploadFile, File()], chapter_number: int = Form(1)):
     try:
-        path = "./"
         print(f"Received file: {file.filename}")
         print(f"Chapter number: {chapter_number}")
         
-        # Get or create graph store for this book/chapter
+        # Create a new session for this request
+        session = await graphrag.create_session()
+        
         try:
-            print("Setting up graph store for book/chapter...")
-            graphStore = graphrag.get_or_create_graph_store(file.filename, chapter_number)
-            print("Graph store setup completed successfully")
+            print("Starting document loading...")
+            document = await graphrag.load_doc(file, session)
+            print(f"Document loading completed. Number of documents: {len(document)}")
         except Exception as e:
-            print(f"Warning: Error during graph store setup: {str(e)}")
+            await graphrag.cleanup_session(session)
+            print(f"Error loading document: {str(e)}")
             return JSONResponse(
                 status_code=500,
-                content={"error": "Graph Store Setup Error", "details": str(e)}
+                content={"error": "Document Loading Error", "step": "load_doc", "details": str(e)}
             )
 
-        # Reset the entire system before processing new document
-        # try:
-        #     print("Resetting system...")
-        #     graphrag.reset_system()
-        #     print("System reset completed successfully")
-        # except Exception as e:
-        #     print(f"Warning: Error during system reset: {str(e)}")
-        #     return JSONResponse(
-        #         status_code=500,
-        #         content={"error": "System Reset Error", "details": str(e)}
-        #     )
-        if graphStore != True:
-            try:
-                print("Starting document loading...")
-                document = graphrag.load_doc(file)
-                print(f"Document loading completed. Number of documents: {len(document)}")
-            except Exception as e:
-                print(f"Error loading document: {str(e)}")
-                return JSONResponse(
-                    status_code=500,
-                    content={"error": "Document Loading Error", "step": "load_doc", "details": str(e)}
-                )
-
-            try:
-                print("Starting document indexing...")
-                graphrag.index_doc(document)
-                print("Document indexing completed")
-            except Exception as e:
-                print(f"Error indexing document: {str(e)}")
-                return JSONResponse(
-                    status_code=500,
-                    content={"error": "Document Indexing Error", "step": "index_doc", "details": str(e)}
-                )
+        try:
+            print("Starting document indexing...")
+            await graphrag.index_doc(document, session)
+            print("Document indexing completed")
+        except Exception as e:
+            await graphrag.cleanup_session(session)
+            print(f"Error indexing document: {str(e)}")
+            return JSONResponse(
+                status_code=500,
+                content={"error": "Document Indexing Error", "step": "index_doc", "details": str(e)}
+            )
 
         json_data_all = []
         for i in ["easy", "medium", "hard"]:
             try:
                 print(f"Generating questions for {i} difficulty...")
-                # Make multiple calls to get 40 questions total
-                for batch in range(3):  # This will generate 15 questions per batch, 3 batches = 45 questions
-                    if graphStore != True:
-                        test = graphrag.QueryEngine(i)
-                    else:
-                        test = graphrag.QueryEngine_from_existing(i,graphStore)
+                for batch in range(3):
+                    test = await graphrag.QueryEngine(i, session)
                     response_answer = str(test)
                     json_data = graphrag.extract_json_from_response(response_answer)
                     json_data = graphrag.add_to_json(json_data, i, chapter_number)
                     json_data_all.extend(json_data)
-                    time.sleep(3)  # Add delay between batches
+                    await asyncio.sleep(3)  # Use asyncio.sleep instead of time.sleep
                 print(f"Completed {i} difficulty level")
             except Exception as e:
+                await graphrag.cleanup_session(session)
                 print(f"Error generating {i} difficulty questions: {str(e)}")
                 return JSONResponse(
                     status_code=500,
@@ -401,6 +277,9 @@ async def predict(file: Annotated[UploadFile, File()], chapter_number: int = For
                         "details": str(e)
                     }
                 )
+        
+        # Clean up the session after successful processing
+        await graphrag.cleanup_session(session)
             
         print(f"Successfully generated {len(json_data_all)} total questions")
         return JSONResponse(content=json_data_all)
