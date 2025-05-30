@@ -104,6 +104,12 @@ class graphRAG:
             time.sleep(5)
             system_driver.close()
             session['request_id'] = request_id
+        self.graph_store = Neo4jPropertyGraphStore(
+                username="neo4j",
+                password="mysecret",
+                url="bolt://0.0.0.0:7687",
+                database=session['request_id']
+            )
         print(f"Session created with request ID: {request_id}")
         return session
 
