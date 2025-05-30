@@ -67,7 +67,7 @@ class graphRAG:
         )
         self.llm_questions = Groq(
             model="deepseek-r1-distill-llama-70b",
-            api_key="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",
+            api_key="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",
             max_retries=2
         )
 
@@ -83,25 +83,48 @@ class graphRAG:
             )
             
             with system_driver.session(database="system") as session:
-                # Check if neo4j database exists
-                result = session.run("SHOW DATABASE neo4j")
-                db_info = result.single()
-                
-                if not db_info or db_info["state"] != "online":
-                    print("Creating and starting neo4j database...")
-                    # Create database if it doesn't exist
-                    session.run("CREATE DATABASE neo4j IF NOT EXISTS")
+                try:
+                    # List all databases first
+                    result = session.run("SHOW DATABASES")
+                    databases = [record["name"] for record in result]
+                    print(f"Available databases: {databases}")
+                    
+                    if "neo4j" not in databases:
+                        print("Creating neo4j database...")
+                        session.run("CREATE DATABASE neo4j")
+                        print("Database created successfully")
+                    
                     # Start the database
+                    print("Starting neo4j database...")
                     session.run("START DATABASE neo4j")
-                    # Wait for database to be online
-                    while True:
-                        result = session.run("SHOW DATABASE neo4j")
-                        db_info = result.single()
-                        if db_info and db_info["state"] == "online":
+                    
+                    # Wait for database to be ready
+                    max_attempts = 10
+                    attempt = 0
+                    while attempt < max_attempts:
+                        try:
+                            # Try to connect to the database
+                            test_driver = GraphDatabase.driver(
+                                "bolt://0.0.0.0:7687",
+                                auth=("neo4j", "mysecret"),
+                                database="neo4j"
+                            )
+                            with test_driver.session() as test_session:
+                                test_session.run("RETURN 1")
+                            test_driver.close()
+                            print("Database is ready!")
                             break
-                        print("Waiting for database to start...")
-                        time.sleep(2)
-                    print("Database started successfully")
+                        except Exception as e:
+                            print(f"Waiting for database to start... (Attempt {attempt + 1}/{max_attempts})")
+                            time.sleep(2)
+                            attempt += 1
+                    
+                    if attempt >= max_attempts:
+                        raise Exception("Database failed to start within the timeout period")
+                    
+                except Exception as e:
+                    print(f"Error during database setup: {str(e)}")
+                    raise
             
             system_driver.close()
             
