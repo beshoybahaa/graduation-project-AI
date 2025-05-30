@@ -94,15 +94,15 @@ class graphRAG:
         graph_name = f"{sanitized_book_name}_chapter_{chapter_number}"
         
         try:
-            # Check if graph exists
+            # Check if graph exists using a simple Cypher query
             with self.base_graph_store._driver.session() as session:
+                # Check if any nodes exist in the graph
                 result = session.run(
-                    "CALL gds.graph.exists($graphName)",
-                    graphName=graph_name
+                    "MATCH (n) RETURN count(n) as node_count LIMIT 1"
                 )
-                exists = result.single()["exists"]
+                node_count = result.single()["node_count"]
                 
-                if not exists:
+                if node_count == 0:
                     print(f"Creating new graph: {graph_name}")
                     # Create new graph store for this book/chapter
                     self.storage_context = Neo4jPropertyGraphStore(
@@ -125,8 +125,8 @@ class graphRAG:
         except Exception as e:
             print(f"Error managing graph store: {str(e)}")
             # Fallback to in-memory graph store
-            self.graph_store = SimpleGraphStore()
-            return self.graph_store
+            self.storage_context = SimpleGraphStore()
+            return None
 
     def clear_neo4j(self):
         """Clear all nodes and relationships from the Neo4j database."""
