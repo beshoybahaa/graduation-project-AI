@@ -77,6 +77,10 @@ class graphRAG:
         """Create or get an existing graph store for a specific book and chapter."""
         # Replace spaces with underscores in book name
         sanitized_book_name = book_name.replace(" ", "_")
+        if "(" in sanitized_book_name:
+            sanitized_book_name = sanitized_book_name.replace("(", "")
+        if ")" in sanitized_book_name:
+            sanitized_book_name = sanitized_book_name.replace(")", "")
         graph_name = f"{sanitized_book_name}_chapter_{chapter_number}"
         
         try:
