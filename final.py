@@ -73,6 +73,27 @@ class graphRAG:
 
         # Initialize base Neo4j connection
         try:
+            print("Checking available Neo4j databases...")
+            from neo4j import GraphDatabase
+            
+            # First connect to system database to list available databases
+            system_driver = GraphDatabase.driver(
+                "bolt://0.0.0.0:7687",
+                auth=("neo4j", "mysecret")
+            )
+            
+            with system_driver.session(database="system") as session:
+                result = session.run("SHOW DATABASES")
+                databases = [record["name"] for record in result]
+                print(f"Available databases: {databases}")
+                
+                if "neo4j" not in databases:
+                    print("Creating neo4j database...")
+                    session.run("CREATE DATABASE neo4j")
+                    print("Database created successfully")
+            
+            system_driver.close()
+            
             print("Attempting to connect to Neo4j...")
             self.base_graph_store = Neo4jPropertyGraphStore(
                 username="neo4j",
