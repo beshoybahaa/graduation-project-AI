@@ -89,7 +89,9 @@ class graphRAG:
 
     def get_or_create_graph_store(self, book_name: str, chapter_number: int):
         """Create or get an existing graph store for a specific book and chapter."""
-        graph_name = f"{book_name}_chapter_{chapter_number}"
+        # Replace spaces with underscores in book name
+        sanitized_book_name = book_name.replace(" ", "_")
+        graph_name = f"{sanitized_book_name}_chapter_{chapter_number}"
         
         try:
             # Check if graph exists
