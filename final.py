@@ -95,12 +95,18 @@ class graphRAG:
     def clear_neo4j(self):
         """Clear all nodes and relationships from the Neo4j database."""
         try:
-            # Use APOC to clear the database
+            # First try to clear using APOC
             self.graph_store.query("CALL apoc.periodic.iterate('MATCH (n) RETURN n', 'DETACH DELETE n', {batchSize: 1000})")
-            print("Successfully cleared Neo4j database")
+            print("Successfully cleared Neo4j database using APOC")
         except Exception as e:
-            print(f"Error clearing Neo4j database: {str(e)}")
-            raise
+            print(f"APOC clear failed, trying direct clear: {str(e)}")
+            try:
+                # Fallback to direct clear if APOC fails
+                self.graph_store.query("MATCH (n) DETACH DELETE n")
+                print("Successfully cleared Neo4j database using direct clear")
+            except Exception as e2:
+                print(f"Error clearing Neo4j database: {str(e2)}")
+                raise
 
     def load_doc(self, file):
         file_path = os.path.join(self.upload_dir, file.filename)
@@ -223,14 +229,18 @@ async def predict(file: Annotated[UploadFile, File()], chapter_number: int = For
         path = "./"
         print(f"Received file: {file.filename}")
         print(f"Chapter number: {chapter_number}")
-        # --------------------temporary code to clear the graph store ----------------------
+        
+        # Clear the database before processing new document
         try:
-            print("Cleaning up...")
+            print("Cleaning up database...")
             graphrag.clear_neo4j()
-            print("Cleanup completed")
+            print("Database cleanup completed successfully")
         except Exception as e:
-            print(f"Warning: Error during cleanup: {str(e)}")
-        # ----------------------------------------------------------------------------------
+            print(f"Warning: Error during database cleanup: {str(e)}")
+            return JSONResponse(
+                status_code=500,
+                content={"error": "Database Cleanup Error", "details": str(e)}
+            )
 
         try:
             print("Starting document loading...")
