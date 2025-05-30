@@ -6,6 +6,7 @@ import re
 import shutil
 import tempfile
 import time
+import uuid
 # from datetime import datetime
 from typing import Union, Annotated
 # from math import ceil
@@ -67,47 +68,58 @@ class graphRAG:
             max_retries=2
         )
 
-        try:
-            print("Attempting to connect to Neo4j...")
-            self.graph_store = Neo4jPropertyGraphStore(
-                username="neo4j",
-                password="mysecret",
-                url="bolt://0.0.0.0:7687",
-            )
-        except Exception as e:
-            print(f"Warning: Could not connect to Neo4j: {str(e)}")
-            print("Falling back to in-memory graph store")
-            self.graph_store = SimpleGraphStore()
-
     async def create_session(self):
-        """Create a new processing session with isolated storage."""
+        """Create a new processing session with isolated storage and temporary Neo4j database."""
+        session_id = str(uuid.uuid4())
         session = {
             'storage_dir': tempfile.mkdtemp(),
             'upload_dir': tempfile.mkdtemp(),
             'index': None,
-            'storage_context': None
+            'storage_context': None,
+            'session_id': session_id,
+            'graph_store': None
         }
+        
+        try:
+            # Create a temporary Neo4j database for this session
+            session['graph_store'] = Neo4jPropertyGraphStore(
+                username="neo4j",
+                password="mysecret",
+                url="bolt://0.0.0.0:7687",
+                database=f"temp_{session_id}"  # Create a unique database name
+            )
+            
+            # Initialize the temporary database
+            with session['graph_store']._driver.session() as neo4j_session:
+                neo4j_session.run(f"CREATE DATABASE temp_{session_id}")
+                neo4j_session.run(f"USE temp_{session_id}")
+                
+        except Exception as e:
+            print(f"Warning: Could not create temporary Neo4j database: {str(e)}")
+            print("Falling back to in-memory graph store")
+            session['graph_store'] = SimpleGraphStore()
+            
         return session
 
     async def cleanup_session(self, session):
-        """Clean up a processing session."""
+        """Clean up a processing session and its temporary Neo4j database."""
         try:
             if os.path.exists(session['storage_dir']):
                 shutil.rmtree(session['storage_dir'])
             if os.path.exists(session['upload_dir']):
                 shutil.rmtree(session['upload_dir'])
+                
+            # Clean up temporary Neo4j database if it exists
+            if session['graph_store'] and isinstance(session['graph_store'], Neo4jPropertyGraphStore):
+                try:
+                    with session['graph_store']._driver.session() as neo4j_session:
+                        neo4j_session.run(f"DROP DATABASE temp_{session['session_id']}")
+                    session['graph_store']._driver.close()
+                except Exception as e:
+                    print(f"Error cleaning up Neo4j database: {str(e)}")
+                    
         except Exception as e:
             print(f"Error cleaning up session: {str(e)}")
-
-    async def clear_neo4j(self):
-        """Clear all nodes and relationships from the Neo4j database."""
-        try:
-            with self.graph_store._driver.session() as session:
-                session.run("MATCH (n) DETACH DELETE n")
-            print("Successfully cleared Neo4j database")
-        except Exception as e:
-            print(f"Error clearing Neo4j database: {str(e)}")
-            raise
 
     async def load_doc(self, file, session):
         file_path = os.path.join(session['upload_dir'], file.filename)
@@ -137,7 +149,7 @@ class graphRAG:
             nodes=nodes,
             embed_model=self.embedding_model,
             kg_extractors=[kg_extractor],
-            property_graph_store=self.graph_store,
+            property_graph_store=session['graph_store'],
             show_progress=True,
         )
 
