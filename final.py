@@ -73,7 +73,6 @@ class graphRAG:
                 username="neo4j",
                 password="mysecret",
                 url="bolt://0.0.0.0:7687",
-                database="neo4j",
             )
         except Exception as e:
             print(f"Warning: Could not connect to Neo4j: {str(e)}")
