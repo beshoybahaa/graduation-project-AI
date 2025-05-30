@@ -53,6 +53,7 @@ class graphRAG:
     query_engine = None
     graph_store = None
     storage_context = None
+    active_sessions = {}  # Track active sessions
         
     def __init__(self):
         self.embedding_model = HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
@@ -87,7 +88,9 @@ class graphRAG:
             'upload_dir': tempfile.mkdtemp(),
             'index': None,
             'storage_context': None,
-            'request_id': None
+            'request_id': None,
+            'created_at': time.time(),
+            'last_accessed': time.time()
         }
         from neo4j import GraphDatabase
         from uuid import uuid4
@@ -95,43 +98,92 @@ class graphRAG:
         request_id = str(uuid4())[:8]
         request_id = f"db{str(request_id).replace('-', '')}"
 
-        system_driver = GraphDatabase.driver(
-                "bolt://0.0.0.0:7687",
-                auth=("neo4j", "mysecret")
-            )
-        with system_driver.session(database="system") as session_db:
-            session_db.run(f"CREATE DATABASE {request_id}")
-            time.sleep(5)
-            system_driver.close()
-            session['request_id'] = request_id
-        self.graph_store = Neo4jPropertyGraphStore(
-                username="neo4j",
-                password="mysecret",
-                url="bolt://0.0.0.0:7687",
-                database=session['request_id']
-            )
-        print(f"Session created with request ID: {request_id}")
-        return session
-
-    async def cleanup_session(self, session):
-        """Clean up a processing session."""
         try:
+            system_driver = GraphDatabase.driver(
+                    "bolt://0.0.0.0:7687",
+                    auth=("neo4j", "mysecret")
+                )
+            with system_driver.session(database="system") as session_db:
+                session_db.run(f"CREATE DATABASE {request_id}")
+                time.sleep(5)  # Wait for database creation
+                system_driver.close()
+                session['request_id'] = request_id
+                
+            self.graph_store = Neo4jPropertyGraphStore(
+                    username="neo4j",
+                    password="mysecret",
+                    url="bolt://0.0.0.0:7687",
+                    database=session['request_id']
+                )
+            
+            # Track the session
+            self.active_sessions[request_id] = session
+            print(f"Session created with request ID: {request_id}")
+            return session
+            
+        except Exception as e:
+            # Cleanup on failure
             if os.path.exists(session['storage_dir']):
                 shutil.rmtree(session['storage_dir'])
             if os.path.exists(session['upload_dir']):
                 shutil.rmtree(session['upload_dir'])
+            raise Exception(f"Failed to create session: {str(e)}")
+
+    async def cleanup_session(self, session):
+        """Clean up a processing session."""
+        if not session or 'request_id' not in session:
+            print("Warning: Invalid session object")
+            return
+            
+        request_id = session['request_id']
+        try:
+            # Clean up file system
+            if os.path.exists(session['storage_dir']):
+                shutil.rmtree(session['storage_dir'])
+            if os.path.exists(session['upload_dir']):
+                shutil.rmtree(session['upload_dir'])
+                
+            # Clean up database
             from neo4j import GraphDatabase
             system_driver = GraphDatabase.driver(
                     "bolt://0.0.0.0:7687",
                     auth=("neo4j", "mysecret")
                 )
             with system_driver.session(database="system") as session_db:
-                session_db.run(f"DROP DATABASE {session['request_id']}")
-                time.sleep(5)
+                session_db.run(f"DROP DATABASE {request_id}")
+                time.sleep(5)  # Wait for database deletion
                 system_driver.close()
-            print(f"Session dropped with request ID: {session['request_id']}")
+                
+            # Remove from active sessions
+            if request_id in self.active_sessions:
+                del self.active_sessions[request_id]
+                
+            print(f"Session dropped with request ID: {request_id}")
+            
         except Exception as e:
             print(f"Error cleaning up session: {str(e)}")
+            # Still try to remove from active sessions
+            if request_id in self.active_sessions:
+                del self.active_sessions[request_id]
+
+    async def cleanup_stale_sessions(self, max_age_seconds=3600):
+        """Clean up sessions that haven't been accessed in a while."""
+        current_time = time.time()
+        sessions_to_cleanup = []
+        
+        for request_id, session in self.active_sessions.items():
+            if current_time - session['last_accessed'] > max_age_seconds:
+                sessions_to_cleanup.append(session)
+                
+        for session in sessions_to_cleanup:
+            await self.cleanup_session(session)
+
+    def update_session_access(self, session):
+        """Update the last accessed time for a session."""
+        if session and 'request_id' in session:
+            request_id = session['request_id']
+            if request_id in self.active_sessions:
+                self.active_sessions[request_id]['last_accessed'] = time.time()
 
     async def clear_neo4j(self):
         """Clear all nodes and relationships from the Neo4j database."""
@@ -257,6 +309,7 @@ def index():
 # post request that takes a review (text type) and returns a sentiment score
 @app.post('/questions')
 async def predict(file: Annotated[UploadFile, File()], chapter_number: int = Form(1)):
+    session = None
     try:
         print(f"Received file: {file.filename}")
         print(f"Chapter number: {chapter_number}")
@@ -319,6 +372,9 @@ async def predict(file: Annotated[UploadFile, File()], chapter_number: int = For
         return JSONResponse(content=json_data_all)
         
     except Exception as e:
+        # Ensure session cleanup in case of unexpected errors
+        if session:
+            await graphrag.cleanup_session(session)
         print(f"Unexpected error: {str(e)}")
         return JSONResponse(
             status_code=500,
