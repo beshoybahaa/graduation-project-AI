@@ -70,8 +70,15 @@ class graphRAG:
             api_key="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",
             max_retries=2
         )
+        
+        return
 
-        # Initialize base Neo4j connection
+    def get_or_create_graph_store(self, book_name: str, chapter_number: int):
+        """Create or get an existing graph store for a specific book and chapter."""
+        # Replace spaces with underscores in book name
+        sanitized_book_name = book_name.replace(" ", "_")
+        graph_name = f"{sanitized_book_name}_chapter_{chapter_number}"
+        
         try:
             print("Checking available Neo4j databases...")
             from neo4j import GraphDatabase
@@ -87,73 +94,29 @@ class graphRAG:
                 databases = [record["name"] for record in result]
                 print(f"Available databases: {databases}")
                 
-                if "neo4jBook" not in databases:
+                found = False
+
+                if graph_name not in databases:
                     print("Creating neo4j database...")
-                    session.run("CREATE DATABASE neo4jBook")
+                    session.run(f"CREATE DATABASE {graph_name}")
                     print("Database created successfully")
                     # Wait for database to be ready
                     time.sleep(5)
-            
-            system_driver.close()
-            
-            print("Attempting to connect to Neo4j...")
-            self.base_graph_store = Neo4jPropertyGraphStore(
-                username="neo4j",
-                password="mysecret",
-                url="bolt://0.0.0.0:7687",
-                database="neo4jBook"  # Explicitly specify the database name
-            )
-        except Exception as e:
-            print(f"Warning: Could not connect to Neo4j: {str(e)}")
-            print("Falling back to in-memory graph store")
-            self.base_graph_store = SimpleGraphStore()
-        
-        self.graph_store = None
-        return
-
-    def get_or_create_graph_store(self, book_name: str, chapter_number: int):
-        """Create or get an existing graph store for a specific book and chapter."""
-        # Replace spaces with underscores in book name
-        sanitized_book_name = book_name.replace(" ", "_")
-        graph_name = f"{sanitized_book_name}_chapter_{chapter_number}"
-        
-        try:
-            # Check if graph exists using a simple Cypher query
-            with self.base_graph_store._driver.session() as session:
-                # Check if any nodes exist with this book and chapter label
-                result = session.run(
-                    "MATCH (n:Book {name: $book_name, chapter: $chapter}) RETURN count(n) as node_count LIMIT 1",
-                    book_name=sanitized_book_name,
-                    chapter=chapter_number
-                )
-                node_count = result.single()["node_count"]
-                
-                if node_count == 0:
-                    print(f"Creating new graph for: {graph_name}")
-                    # Create new graph store for this book/chapter
-                    self.storage_context = Neo4jPropertyGraphStore(
-                        username="neo4j",
-                        password="mysecret",
-                        url="bolt://0.0.0.0:7687"
-                    )
-                    # Create a book node to mark this graph
-                    with self.storage_context._driver.session() as session:
-                        session.run(
-                            "CREATE (b:Book {name: $book_name, chapter: $chapter})",
-                            book_name=sanitized_book_name,
-                            chapter=chapter_number
-                        )
-                    print("return None for graph store")
-                    return None
+                    system_driver.close()
                 else:
-                    print(f"Using existing graph: {graph_name}")
-                    self.storage_context = Neo4jPropertyGraphStore(
-                        username="neo4j",
-                        password="mysecret",
-                        url="bolt://0.0.0.0:7687"
-                    )
-                    print("return graph store")
-                    return self.storage_context
+                    found = True
+
+                print("Attempting to connect to Neo4j...")
+                self.base_graph_store = Neo4jPropertyGraphStore(
+                    username="neo4j",
+                    password="mysecret",
+                    url="bolt://0.0.0.0:7687",
+                    database=graph_name  # Explicitly specify the database name
+                )
+            if found == True:
+                return found
+            else:
+                return self.base_graph_store
                 
         except Exception as e:
             print(f"Error managing graph store: {str(e)}")
@@ -376,7 +339,7 @@ async def predict(file: Annotated[UploadFile, File()], chapter_number: int = For
         #         status_code=500,
         #         content={"error": "System Reset Error", "details": str(e)}
         #     )
-        if graphStore is None:
+        if graphStore != True:
             try:
                 print("Starting document loading...")
                 document = graphrag.load_doc(file)
@@ -405,7 +368,7 @@ async def predict(file: Annotated[UploadFile, File()], chapter_number: int = For
                 print(f"Generating questions for {i} difficulty...")
                 # Make multiple calls to get 40 questions total
                 for batch in range(3):  # This will generate 15 questions per batch, 3 batches = 45 questions
-                    if graphStore is None:
+                    if graphStore != True:
                         test = graphrag.QueryEngine(i)
                     else:
                         test = graphrag.QueryEngine(i,graphStore)
