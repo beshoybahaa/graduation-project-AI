@@ -103,6 +103,31 @@ class graphRAG:
             print(f"Error clearing Neo4j database: {str(e)}")
             raise
 
+    def reset_system(self):
+        """Reset the entire system to ensure no old data remains."""
+        try:
+            # Clear the Neo4j database
+            self.clear_neo4j()
+            
+            # Reset the index and storage context
+            self.index = None
+            self.storage_context = None
+            
+            # Clear temporary directories
+            if os.path.exists(self.storage_dir):
+                shutil.rmtree(self.storage_dir)
+            if os.path.exists(self.upload_dir):
+                shutil.rmtree(self.upload_dir)
+            
+            # Create fresh temporary directories
+            self.storage_dir = tempfile.mkdtemp()
+            self.upload_dir = tempfile.mkdtemp()
+            
+            print("Successfully reset the entire system")
+        except Exception as e:
+            print(f"Error resetting system: {str(e)}")
+            raise
+
     def load_doc(self, file):
         file_path = os.path.join(self.upload_dir, file.filename)
         
@@ -120,8 +145,8 @@ class graphRAG:
 
     def index_doc(self, doc):
         splitter = SentenceSplitter(
-            chunk_size=150,
-            chunk_overlap=30,
+            chunk_size=500,
+            chunk_overlap=150,
         )
         nodes = splitter.get_nodes_from_documents(doc)
 
@@ -225,16 +250,16 @@ async def predict(file: Annotated[UploadFile, File()], chapter_number: int = For
         print(f"Received file: {file.filename}")
         print(f"Chapter number: {chapter_number}")
         
-        # Clear the database before processing new document
+        # Reset the entire system before processing new document
         try:
-            print("Cleaning up database...")
-            graphrag.clear_neo4j()
-            print("Database cleanup completed successfully")
+            print("Resetting system...")
+            graphrag.reset_system()
+            print("System reset completed successfully")
         except Exception as e:
-            print(f"Warning: Error during database cleanup: {str(e)}")
+            print(f"Warning: Error during system reset: {str(e)}")
             return JSONResponse(
                 status_code=500,
-                content={"error": "Database Cleanup Error", "details": str(e)}
+                content={"error": "System Reset Error", "details": str(e)}
             )
 
         try:
