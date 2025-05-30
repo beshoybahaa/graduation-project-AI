@@ -89,11 +89,12 @@ class graphRAG:
                 database="system"  # Connect to system database first
             )
             
-            # Create the temporary database
+            # Create the temporary database using the correct procedure call
             with system_store._driver.session() as neo4j_session:
-                neo4j_session.run(f"CREATE DATABASE temp_{session_id} IF NOT EXISTS")
+                # Create the database
+                neo4j_session.run("CALL dbms.createDatabase($dbName)", {"dbName": f"temp_{session_id}"})
                 # Wait for the database to be ready
-                neo4j_session.run("CALL dbms.waitForDatabase('temp_" + session_id + "')")
+                neo4j_session.run("CALL dbms.waitForDatabase($dbName)", {"dbName": f"temp_{session_id}"})
             
             # Close the system connection
             system_store._driver.close()
@@ -137,7 +138,8 @@ class graphRAG:
                     )
                     
                     with system_store._driver.session() as neo4j_session:
-                        neo4j_session.run(f"DROP DATABASE temp_{session['session_id']} IF EXISTS")
+                        # Drop the database using the correct procedure call
+                        neo4j_session.run("CALL dbms.dropDatabase($dbName)", {"dbName": f"temp_{session['session_id']}"})
                     
                     # Close both connections
                     system_store._driver.close()
