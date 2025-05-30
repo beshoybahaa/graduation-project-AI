@@ -96,21 +96,29 @@ class graphRAG:
         try:
             # Check if graph exists using a simple Cypher query
             with self.base_graph_store._driver.session() as session:
-                # Check if any nodes exist in the graph
+                # Check if any nodes exist with this book and chapter label
                 result = session.run(
-                    "MATCH (n) RETURN count(n) as node_count LIMIT 1"
+                    "MATCH (n:Book {name: $book_name, chapter: $chapter}) RETURN count(n) as node_count LIMIT 1",
+                    book_name=sanitized_book_name,
+                    chapter=chapter_number
                 )
                 node_count = result.single()["node_count"]
                 
                 if node_count == 0:
-                    print(f"Creating new graph: {graph_name}")
+                    print(f"Creating new graph for: {graph_name}")
                     # Create new graph store for this book/chapter
                     self.storage_context = Neo4jPropertyGraphStore(
                         username="neo4j",
                         password="mysecret",
-                        url="bolt://0.0.0.0:7687",
-                        graph_name=graph_name
+                        url="bolt://0.0.0.0:7687"
                     )
+                    # Create a book node to mark this graph
+                    with self.storage_context._driver.session() as session:
+                        session.run(
+                            "CREATE (b:Book {name: $book_name, chapter: $chapter})",
+                            book_name=sanitized_book_name,
+                            chapter=chapter_number
+                        )
                     print("return None for graph store")
                     return None
                 else:
@@ -118,8 +126,7 @@ class graphRAG:
                     self.storage_context = Neo4jPropertyGraphStore(
                         username="neo4j",
                         password="mysecret",
-                        url="bolt://0.0.0.0:7687",
-                        graph_name=graph_name
+                        url="bolt://0.0.0.0:7687"
                     )
                     print("return graph store")
                     return self.storage_context
