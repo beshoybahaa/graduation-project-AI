@@ -1,0 +1,42 @@
+name: Deploy to Azure VM
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
+  AZURE_VM_USERNAME: ${{ secrets.AZURE_VM_USERNAME }}
+  PORT: 8000
+  HOST: 0.0.0.0
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11.12'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Deploy to Azure VM
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ env.AZURE_VM_HOST }}
+        username: ${{ env.AZURE_VM_USERNAME }}
+        key: ${{ secrets.AZURE_VM_SSH_KEY }}
+        script: |
+          cd /home/${{ env.AZURE_VM_USERNAME }}/graduation-project-AI
+          git pull
+          pip install -r requirements.txt
+          pm2 restart final || pm2 start final.py --name final 
