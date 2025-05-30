@@ -102,6 +102,8 @@ class graphRAG:
                 databases = [record["name"] for record in result]
                 print(f"Available databases: {databases}")
                 
+                found = False
+
                 if graph_name.lower() not in [db.lower() for db in databases]:
                     print("Creating neo4j database...")
                     session.run(f"CREATE DATABASE {graph_name}")
@@ -111,6 +113,7 @@ class graphRAG:
                     system_driver.close()
                 else:
                     print("Database already exists")
+                    found = True
 
                 print("Attempting to connect to Neo4j...")
                 self.base_graph_store = Neo4jPropertyGraphStore(
@@ -119,6 +122,9 @@ class graphRAG:
                     url="bolt://0.0.0.0:7687",
                     database=graph_name  # Explicitly specify the database name
                 )
+            if found == True:
+                return found
+            else:
                 return self.base_graph_store
                 
         except Exception as e:
@@ -236,10 +242,9 @@ class graphRAG:
 
     def QueryEngine_from_existing(self, difficulty_level, storage_context):
         self.index = PropertyGraphIndex.from_existing(
-                property_graph_store=storage_context,
-                embed_model=self.embedding_model,
-                include_embeddings=False  # Disable embeddings since Neo4j might not support vector queries
-            )
+            property_graph_store=storage_context,  # Use storage_context directly as it's already a Neo4jPropertyGraphStore
+            embed_model=self.embedding_model
+        )
         query_engine = self.index.as_query_engine(
             llm=self.llm_questions,
             show_progress=True,
@@ -336,19 +341,18 @@ async def predict(file: Annotated[UploadFile, File()], chapter_number: int = For
                 content={"error": "Graph Store Setup Error", "details": str(e)}
             )
 
-        # Check if this is a new database (needs processing)
-        is_new_database = False
-        try:
-            with graphStore._driver.session() as session:
-                result = session.run("MATCH (n) RETURN count(n) as count")
-                count = result.single()["count"]
-                is_new_database = count == 0
-        except Exception as e:
-            print(f"Error checking database status: {str(e)}")
-            is_new_database = True
-
-        if is_new_database:
-            print("New database detected - processing document...")
+        # Reset the entire system before processing new document
+        # try:
+        #     print("Resetting system...")
+        #     graphrag.reset_system()
+        #     print("System reset completed successfully")
+        # except Exception as e:
+        #     print(f"Warning: Error during system reset: {str(e)}")
+        #     return JSONResponse(
+        #         status_code=500,
+        #         content={"error": "System Reset Error", "details": str(e)}
+        #     )
+        if graphStore != True:
             try:
                 print("Starting document loading...")
                 document = graphrag.load_doc(file)
@@ -370,8 +374,6 @@ async def predict(file: Annotated[UploadFile, File()], chapter_number: int = For
                     status_code=500,
                     content={"error": "Document Indexing Error", "step": "index_doc", "details": str(e)}
                 )
-        else:
-            print("Using existing processed database...")
 
         json_data_all = []
         for i in ["easy", "medium", "hard"]:
@@ -379,10 +381,10 @@ async def predict(file: Annotated[UploadFile, File()], chapter_number: int = For
                 print(f"Generating questions for {i} difficulty...")
                 # Make multiple calls to get 40 questions total
                 for batch in range(3):  # This will generate 15 questions per batch, 3 batches = 45 questions
-                    if is_new_database:
+                    if graphStore != True:
                         test = graphrag.QueryEngine(i)
                     else:
-                        test = graphrag.QueryEngine_from_existing(i, graphStore)
+                        test = graphrag.QueryEngine_from_existing(i,graphStore)
                     response_answer = str(test)
                     json_data = graphrag.extract_json_from_response(response_answer)
                     json_data = graphrag.add_to_json(json_data, i, chapter_number)
