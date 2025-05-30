@@ -101,6 +101,8 @@ class graphRAG:
                     # Wait for database to be ready
                     max_attempts = 10
                     attempt = 0
+                    last_error = None
+                    
                     while attempt < max_attempts:
                         try:
                             # Try to connect to the database
@@ -110,17 +112,30 @@ class graphRAG:
                                 database="neo4j"
                             )
                             with test_driver.session() as test_session:
-                                test_session.run("RETURN 1")
+                                # Try a simple query
+                                result = test_session.run("RETURN 1")
+                                value = result.single()[0]
+                                if value == 1:
+                                    print("Database is ready!")
+                                    test_driver.close()
+                                    break
                             test_driver.close()
-                            print("Database is ready!")
-                            break
                         except Exception as e:
-                            print(f"Waiting for database to start... (Attempt {attempt + 1}/{max_attempts})")
+                            last_error = str(e)
+                            print(f"Attempt {attempt + 1}/{max_attempts} failed: {last_error}")
                             time.sleep(2)
                             attempt += 1
                     
                     if attempt >= max_attempts:
-                        raise Exception("Database failed to start within the timeout period")
+                        print("\nDatabase connection failed after all attempts.")
+                        print("Last error received:", last_error)
+                        print("\nTroubleshooting steps:")
+                        print("1. Check if Neo4j service is running")
+                        print("2. Verify Neo4j Enterprise Edition is installed")
+                        print("3. Check if port 7687 is accessible")
+                        print("4. Verify username and password are correct")
+                        print("5. Check Neo4j logs for any errors")
+                        raise Exception(f"Database connection failed: {last_error}")
                     
                 except Exception as e:
                     print(f"Error during database setup: {str(e)}")
