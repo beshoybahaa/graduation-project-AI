@@ -92,7 +92,7 @@ class graphRAG:
         from neo4j import GraphDatabase
         from uuid import uuid4
 
-        request_id = str(uuid4())
+        request_id = str(uuid4())[:8]
         request_id = f"db_{str(request_id).replace('-', '')}"
 
         system_driver = GraphDatabase.driver(
