@@ -123,7 +123,7 @@ class graphRAG:
                     database=graph_name  # Explicitly specify the database name
                 )
             if found == True:
-                return found
+                return True
             else:
                 return self.base_graph_store
                 
