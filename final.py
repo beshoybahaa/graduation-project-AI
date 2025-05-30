@@ -104,7 +104,7 @@ class graphRAG:
                 
                 found = False
 
-                if graph_name not in databases:
+                if graph_name.lower() not in [db.lower() for db in databases]:
                     print("Creating neo4j database...")
                     session.run(f"CREATE DATABASE {graph_name}")
                     print("Database created successfully")
