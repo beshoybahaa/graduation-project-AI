@@ -240,7 +240,7 @@ class graphRAG:
             }}""")
         return response
 
-    def QueryEngine(self, difficulty_level,storage_context):
+    def QueryEngine_from_existing(self, difficulty_level,storage_context):
         self.index = PropertyGraphIndex.from_existing(
             property_graph_store=storage_context.property_graph_store,
             embed_model=self.embedding_model
@@ -384,7 +384,7 @@ async def predict(file: Annotated[UploadFile, File()], chapter_number: int = For
                     if graphStore != True:
                         test = graphrag.QueryEngine(i)
                     else:
-                        test = graphrag.QueryEngine(i,graphStore)
+                        test = graphrag.QueryEngine_from_existing(i,graphStore)
                     response_answer = str(test)
                     json_data = graphrag.extract_json_from_response(response_answer)
                     json_data = graphrag.add_to_json(json_data, i, chapter_number)
