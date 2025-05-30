@@ -76,13 +76,16 @@ class graphRAG:
     def get_or_create_graph_store(self, book_name: str, chapter_number: int):
         """Create or get an existing graph store for a specific book and chapter."""
         # Replace spaces with underscores in book name
-        sanitized_book_name = book_name.replace(" ", "-")
+        sanitized_book_name = book_name.replace(" ", "_")
         if "(" in sanitized_book_name:
             sanitized_book_name = sanitized_book_name.replace("(", "")
         if ")" in sanitized_book_name:
             sanitized_book_name = sanitized_book_name.replace(")", "")
         sanitized_book_name = sanitized_book_name.replace(".pdf", "")
-        graph_name = f"{sanitized_book_name}_chapter_{chapter_number}"
+        # Convert to camel case
+        words = sanitized_book_name.split('_')
+        sanitized_book_name = words[0].lower() + ''.join(word.capitalize() for word in words[1:])
+        graph_name = f"{sanitized_book_name}Chapter{chapter_number}"
         
         try:
             print("Checking available Neo4j databases...")
