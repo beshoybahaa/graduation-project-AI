@@ -241,10 +241,11 @@ class graphRAG:
         return response
 
     def QueryEngine(self, difficulty_level,storage_context):
+        self.index = PropertyGraphIndex.from_graph_store(storage_context)
         query_engine = self.index.as_query_engine(
             llm=self.llm_questions,
             show_progress=True,
-            storage_context=storage_context,
+            storage_context=self.index.storage_context,
             include_text=True,
         )
         response = query_engine.query(f"""You are an AI designed to generate multiple-choice questions (MCQs) based on a provided chapter of a book. Your task is to create a set of MCQs that focus on the main subject matter of the chapter. Ensure that each question is clear, concise, and relevant to the core themes of the chapter and be closed book style. Use the following structure for the MCQs:
