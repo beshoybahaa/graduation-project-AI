@@ -55,7 +55,6 @@ class graphRAG:
     storage_context = None
         
     def __init__(self):
-
         self.storage_dir = tempfile.mkdtemp()
         self.upload_dir = tempfile.mkdtemp()
         
@@ -72,25 +71,60 @@ class graphRAG:
             max_retries=2
         )
 
+        # Initialize base Neo4j connection
         try:
             print("Attempting to connect to Neo4j...")
-            # Connect to Neo4j with explicit APOC configuration
-            
-
-            # Note: used to be `Neo4jPGStore`
-            self.graph_store = Neo4jPropertyGraphStore(
+            self.base_graph_store = Neo4jPropertyGraphStore(
                 username="neo4j",
                 password="mysecret",
                 url="bolt://0.0.0.0:7687",
             )
-
         except Exception as e:
             print(f"Warning: Could not connect to Neo4j: {str(e)}")
             print("Falling back to in-memory graph store")
-            # Fallback to in-memory graph store if Neo4j is not available
-            self.graph_store = SimpleGraphStore()
-
+            self.base_graph_store = SimpleGraphStore()
+        
+        self.graph_store = None
         return
+
+    def get_or_create_graph_store(self, book_name: str, chapter_number: int):
+        """Create or get an existing graph store for a specific book and chapter."""
+        graph_name = f"{book_name}_chapter_{chapter_number}"
+        
+        try:
+            # Check if graph exists
+            with self.base_graph_store._driver.session() as session:
+                result = session.run(
+                    "CALL gds.graph.exists($graphName)",
+                    graphName=graph_name
+                )
+                exists = result.single()["exists"]
+                
+                if not exists:
+                    print(f"Creating new graph: {graph_name}")
+                    # Create new graph store for this book/chapter
+                    self.graph_store = Neo4jPropertyGraphStore(
+                        username="neo4j",
+                        password="mysecret",
+                        url="bolt://0.0.0.0:7687",
+                        graph_name=graph_name
+                    )
+                else:
+                    print(f"Using existing graph: {graph_name}")
+                    self.graph_store = Neo4jPropertyGraphStore(
+                        username="neo4j",
+                        password="mysecret",
+                        url="bolt://0.0.0.0:7687",
+                        graph_name=graph_name
+                    )
+                
+                return self.graph_store
+                
+        except Exception as e:
+            print(f"Error managing graph store: {str(e)}")
+            # Fallback to in-memory graph store
+            self.graph_store = SimpleGraphStore()
+            return self.graph_store
 
     def clear_neo4j(self):
         """Clear all nodes and relationships from the Neo4j database."""
@@ -198,6 +232,40 @@ class graphRAG:
             "correctAnswer":"answerD"
             }}""")
         return response
+
+    def QueryEngine(self, difficulty_level,storage_context):
+        query_engine = self.index.as_query_engine(
+            llm=self.llm_questions,
+            show_progress=True,
+            storage_context=storage_context,
+            include_text=True,
+        )
+        response = query_engine.query(f"""You are an AI designed to generate multiple-choice questions (MCQs) based on a provided chapter of a book. Your task is to create a set of MCQs that focus on the main subject matter of the chapter. Ensure that each question is clear, concise, and relevant to the core themes of the chapter and be closed book style. Use the following structure for the MCQs:
+            
+            1. **Question Statement**: A clear and precise question related to the chapter content.
+            2. **Answer Choices**: Four options labeled A, B, C, and D, where only one option is correct. The incorrect options should be plausible to challenge the reader's knowledge.
+            3. **Correct Answer**: give me the correct answer of the question
+            examples for questions : 
+            1		Which of the following is not one of the components of a data communication system?
+                A)	Message
+                B)	Sender
+                C)	Medium
+                D)	All of the choices are correct
+
+            Please ensure that the questions reflect a deep understanding of the chapter's main ideas and concepts while varying the complexity to accommodate different levels of knowledge. Provide 15 questions for {difficulty_level} level.
+            
+            Begin by analyzing the chapter content thoroughly to extract key concepts, terms, and themes that can be transformed into question formats. 
+            
+            and make the output form in json form like thie example : 
+            {{
+            "question":"Which of the following is not one of the characteristics of a data communication system?",
+            "answerA":"Delivery",
+            "answerB":"Accuracy",
+            "answerC":"Jitter",
+            "answerD":"All of the choices are correct",
+            "correctAnswer":"answerD"
+            }}""")
+        return response
     
     def extract_json_from_response(self, response: str):
         # Match individual JSON objects inside brackets
@@ -250,39 +318,51 @@ async def predict(file: Annotated[UploadFile, File()], chapter_number: int = For
         print(f"Received file: {file.filename}")
         print(f"Chapter number: {chapter_number}")
         
+        # Get or create graph store for this book/chapter
+        try:
+            print("Setting up graph store for book/chapter...")
+            graphStore = graphrag.get_or_create_graph_store(file.filename, chapter_number)
+            print("Graph store setup completed successfully")
+        except Exception as e:
+            print(f"Warning: Error during graph store setup: {str(e)}")
+            return JSONResponse(
+                status_code=500,
+                content={"error": "Graph Store Setup Error", "details": str(e)}
+            )
+
         # Reset the entire system before processing new document
-        try:
-            print("Resetting system...")
-            graphrag.reset_system()
-            print("System reset completed successfully")
-        except Exception as e:
-            print(f"Warning: Error during system reset: {str(e)}")
-            return JSONResponse(
-                status_code=500,
-                content={"error": "System Reset Error", "details": str(e)}
-            )
+        # try:
+        #     print("Resetting system...")
+        #     graphrag.reset_system()
+        #     print("System reset completed successfully")
+        # except Exception as e:
+        #     print(f"Warning: Error during system reset: {str(e)}")
+        #     return JSONResponse(
+        #         status_code=500,
+        #         content={"error": "System Reset Error", "details": str(e)}
+        #     )
+        if graphStore is None:
+            try:
+                print("Starting document loading...")
+                document = graphrag.load_doc(file)
+                print(f"Document loading completed. Number of documents: {len(document)}")
+            except Exception as e:
+                print(f"Error loading document: {str(e)}")
+                return JSONResponse(
+                    status_code=500,
+                    content={"error": "Document Loading Error", "step": "load_doc", "details": str(e)}
+                )
 
-        try:
-            print("Starting document loading...")
-            document = graphrag.load_doc(file)
-            print(f"Document loading completed. Number of documents: {len(document)}")
-        except Exception as e:
-            print(f"Error loading document: {str(e)}")
-            return JSONResponse(
-                status_code=500,
-                content={"error": "Document Loading Error", "step": "load_doc", "details": str(e)}
-            )
-
-        try:
-            print("Starting document indexing...")
-            graphrag.index_doc(document)
-            print("Document indexing completed")
-        except Exception as e:
-            print(f"Error indexing document: {str(e)}")
-            return JSONResponse(
-                status_code=500,
-                content={"error": "Document Indexing Error", "step": "index_doc", "details": str(e)}
-            )
+            try:
+                print("Starting document indexing...")
+                graphrag.index_doc(document)
+                print("Document indexing completed")
+            except Exception as e:
+                print(f"Error indexing document: {str(e)}")
+                return JSONResponse(
+                    status_code=500,
+                    content={"error": "Document Indexing Error", "step": "index_doc", "details": str(e)}
+                )
 
         json_data_all = []
         for i in ["easy", "medium", "hard"]:
@@ -290,7 +370,10 @@ async def predict(file: Annotated[UploadFile, File()], chapter_number: int = For
                 print(f"Generating questions for {i} difficulty...")
                 # Make multiple calls to get 40 questions total
                 for batch in range(3):  # This will generate 15 questions per batch, 3 batches = 45 questions
-                    test = graphrag.QueryEngine(i)
+                    if graphStore is None:
+                        test = graphrag.QueryEngine(i)
+                    else:
+                        test = graphrag.QueryEngine(i,graphStore)
                     response_answer = str(test)
                     json_data = graphrag.extract_json_from_response(response_answer)
                     json_data = graphrag.add_to_json(json_data, i, chapter_number)
