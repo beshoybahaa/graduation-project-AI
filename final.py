@@ -105,22 +105,22 @@ class graphRAG:
                 if not exists:
                     print(f"Creating new graph: {graph_name}")
                     # Create new graph store for this book/chapter
-                    self.graph_store = Neo4jPropertyGraphStore(
+                    self.storage_context = Neo4jPropertyGraphStore(
                         username="neo4j",
                         password="mysecret",
                         url="bolt://0.0.0.0:7687",
                         graph_name=graph_name
                     )
+                    return None
                 else:
                     print(f"Using existing graph: {graph_name}")
-                    self.graph_store = Neo4jPropertyGraphStore(
+                    self.storage_context = Neo4jPropertyGraphStore(
                         username="neo4j",
                         password="mysecret",
                         url="bolt://0.0.0.0:7687",
                         graph_name=graph_name
                     )
-                
-                return self.graph_store
+                    return self.storage_context
                 
         except Exception as e:
             print(f"Error managing graph store: {str(e)}")
