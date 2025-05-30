@@ -67,7 +67,7 @@ class graphRAG:
         )
         self.llm_questions = Groq(
             model="deepseek-r1-distill-llama-70b",
-            api_key="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",
+            api_key="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",
             max_retries=2
         )
 
@@ -83,63 +83,14 @@ class graphRAG:
             )
             
             with system_driver.session(database="system") as session:
-                try:
-                    # List all databases first
-                    result = session.run("SHOW DATABASES")
-                    databases = [record["name"] for record in result]
-                    print(f"Available databases: {databases}")
-                    
-                    if "neo4j" not in databases:
-                        print("Creating neo4j database...")
-                        session.run("CREATE DATABASE neo4j")
-                        print("Database created successfully")
-                    
-                    # Start the database
-                    print("Starting neo4j database...")
-                    session.run("START DATABASE neo4j")
-                    
-                    # Wait for database to be ready
-                    max_attempts = 10
-                    attempt = 0
-                    last_error = None
-                    
-                    while attempt < max_attempts:
-                        try:
-                            # Try to connect to the database
-                            test_driver = GraphDatabase.driver(
-                                "bolt://0.0.0.0:7687",
-                                auth=("neo4j", "mysecret"),
-                                database="neo4j"
-                            )
-                            with test_driver.session() as test_session:
-                                # Try a simple query
-                                result = test_session.run("RETURN 1")
-                                value = result.single()[0]
-                                if value == 1:
-                                    print("Database is ready!")
-                                    test_driver.close()
-                                    break
-                            test_driver.close()
-                        except Exception as e:
-                            last_error = str(e)
-                            print(f"Attempt {attempt + 1}/{max_attempts} failed: {last_error}")
-                            time.sleep(2)
-                            attempt += 1
-                    
-                    if attempt >= max_attempts:
-                        print("\nDatabase connection failed after all attempts.")
-                        print("Last error received:", last_error)
-                        print("\nTroubleshooting steps:")
-                        print("1. Check if Neo4j service is running")
-                        print("2. Verify Neo4j Enterprise Edition is installed")
-                        print("3. Check if port 7687 is accessible")
-                        print("4. Verify username and password are correct")
-                        print("5. Check Neo4j logs for any errors")
-                        raise Exception(f"Database connection failed: {last_error}")
-                    
-                except Exception as e:
-                    print(f"Error during database setup: {str(e)}")
-                    raise
+                result = session.run("SHOW DATABASES")
+                databases = [record["name"] for record in result]
+                print(f"Available databases: {databases}")
+                
+                if "neo4j" not in databases:
+                    print("Creating neo4j database...")
+                    session.run("CREATE DATABASE neo4j")
+                    print("Database created successfully")
             
             system_driver.close()
             
@@ -148,7 +99,7 @@ class graphRAG:
                 username="neo4j",
                 password="mysecret",
                 url="bolt://0.0.0.0:7687",
-                database="neo4j"
+                database=databases[0]
             )
         except Exception as e:
             print(f"Warning: Could not connect to Neo4j: {str(e)}")
