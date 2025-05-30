@@ -95,8 +95,9 @@ class graphRAG:
     def clear_neo4j(self):
         """Clear all nodes and relationships from the Neo4j database."""
         try:
-            # Clear the graph store using the proper method
-            self.graph_store.clear()
+            # Get the Neo4j client from the graph store and execute a clear command
+            with self.graph_store._driver.session() as session:
+                session.run("MATCH (n) DETACH DELETE n")
             print("Successfully cleared Neo4j database")
         except Exception as e:
             print(f"Error clearing Neo4j database: {str(e)}")
