@@ -242,9 +242,10 @@ class graphRAG:
 
     def QueryEngine_from_existing(self, difficulty_level, storage_context):
         self.index = PropertyGraphIndex.from_existing(
-            property_graph_store=storage_context,  # Use storage_context directly as it's already a Neo4jPropertyGraphStore
-            embed_model=self.embedding_model
-        )
+                property_graph_store=storage_context,
+                embed_model=self.embedding_model,
+                include_embeddings=False  # Disable embeddings since Neo4j might not support vector queries
+            )
         query_engine = self.index.as_query_engine(
             llm=self.llm_questions,
             show_progress=True,
