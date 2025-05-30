@@ -240,9 +240,9 @@ class graphRAG:
             }}""")
         return response
 
-    def QueryEngine_from_existing(self, difficulty_level,storage_context):
+    def QueryEngine_from_existing(self, difficulty_level, storage_context):
         self.index = PropertyGraphIndex.from_existing(
-            property_graph_store=storage_context.property_graph_store,
+            property_graph_store=storage_context,  # Use storage_context directly as it's already a Neo4jPropertyGraphStore
             embed_model=self.embedding_model
         )
         query_engine = self.index.as_query_engine(
