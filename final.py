@@ -111,6 +111,7 @@ class graphRAG:
                         url="bolt://0.0.0.0:7687",
                         graph_name=graph_name
                     )
+                    print("return None for graph store")
                     return None
                 else:
                     print(f"Using existing graph: {graph_name}")
@@ -120,6 +121,7 @@ class graphRAG:
                         url="bolt://0.0.0.0:7687",
                         graph_name=graph_name
                     )
+                    print("return graph store")
                     return self.storage_context
                 
         except Exception as e:
