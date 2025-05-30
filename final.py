@@ -6,7 +6,6 @@ import re
 import shutil
 import tempfile
 import time
-import uuid
 # from datetime import datetime
 from typing import Union, Annotated
 # from math import ceil
@@ -68,87 +67,73 @@ class graphRAG:
             max_retries=2
         )
 
+        try:
+            print("Attempting to connect to Neo4j...")
+            self.graph_store = Neo4jPropertyGraphStore(
+                username="neo4j",
+                password="mysecret",
+                url="bolt://0.0.0.0:7687",
+            )
+        except Exception as e:
+            print(f"Warning: Could not connect to Neo4j: {str(e)}")
+            print("Falling back to in-memory graph store")
+            self.graph_store = SimpleGraphStore()
+
     async def create_session(self):
-        """Create a new processing session with isolated storage and temporary Neo4j database."""
-        session_id = str(uuid.uuid4())
+        """Create a new processing session with isolated storage."""
         session = {
             'storage_dir': tempfile.mkdtemp(),
             'upload_dir': tempfile.mkdtemp(),
             'index': None,
             'storage_context': None,
-            'session_id': session_id,
-            'graph_store': None
+            'request_id': None
         }
-        
-        try:
-            # First create a connection to the system database
-            system_store = Neo4jPropertyGraphStore(
-                username="neo4j",
-                password="mysecret",
-                url="bolt://0.0.0.0:7687",
-                database="system"  # Connect to system database first
+        from neo4j import GraphDatabase
+        from uuid import uuid4
+
+        request_id = str(uuid4())
+
+        system_driver = GraphDatabase.driver(
+                "bolt://0.0.0.0:7687",
+                auth=("neo4j", "mysecret")
             )
-            
-            # Create the temporary database using the correct procedure call
-            with system_store._driver.session() as neo4j_session:
-                # Create the database
-                neo4j_session.run("CALL dbms.createDatabase($dbName)", {"dbName": f"temp_{session_id}"})
-                # Wait for the database to be ready
-                neo4j_session.run("CALL dbms.waitForDatabase($dbName)", {"dbName": f"temp_{session_id}"})
-            
-            # Close the system connection
-            system_store._driver.close()
-            
-            # Now connect to the newly created database
-            session['graph_store'] = Neo4jPropertyGraphStore(
-                username="neo4j",
-                password="mysecret",
-                url="bolt://0.0.0.0:7687",
-                database=f"temp_{session_id}"
-            )
-            
-            # Verify the connection
-            with session['graph_store']._driver.session() as neo4j_session:
-                neo4j_session.run("RETURN 1")
-                
-        except Exception as e:
-            print(f"Warning: Could not create temporary Neo4j database: {str(e)}")
-            print("Falling back to in-memory graph store")
-            session['graph_store'] = SimpleGraphStore()
-            
+        with system_driver.session(database="system") as session_db:
+            session_db.run(f"CREATE DATABASE {request_id}")
+            time.sleep(5)
+            system_driver.close()
+            session['request_id'] = request_id
+        print(f"Session created with request ID: {request_id}")
         return session
 
     async def cleanup_session(self, session):
-        """Clean up a processing session and its temporary Neo4j database."""
+        """Clean up a processing session."""
         try:
             if os.path.exists(session['storage_dir']):
                 shutil.rmtree(session['storage_dir'])
             if os.path.exists(session['upload_dir']):
                 shutil.rmtree(session['upload_dir'])
-                
-            # Clean up temporary Neo4j database if it exists
-            if session['graph_store'] and isinstance(session['graph_store'], Neo4jPropertyGraphStore):
-                try:
-                    # Connect to system database to drop the temporary database
-                    system_store = Neo4jPropertyGraphStore(
-                        username="neo4j",
-                        password="mysecret",
-                        url="bolt://0.0.0.0:7687",
-                        database="system"
-                    )
-                    
-                    with system_store._driver.session() as neo4j_session:
-                        # Drop the database using the correct procedure call
-                        neo4j_session.run("CALL dbms.dropDatabase($dbName)", {"dbName": f"temp_{session['session_id']}"})
-                    
-                    # Close both connections
-                    system_store._driver.close()
-                    session['graph_store']._driver.close()
-                except Exception as e:
-                    print(f"Error cleaning up Neo4j database: {str(e)}")
-                    
+            from neo4j import GraphDatabase
+            system_driver = GraphDatabase.driver(
+                    "bolt://0.0.0.0:7687",
+                    auth=("neo4j", "mysecret")
+                )
+            with system_driver.session(database="system") as session_db:
+                session_db.run(f"DROP DATABASE {session['request_id']}")
+                time.sleep(5)
+                system_driver.close()
+            print(f"Session dropped with request ID: {session['request_id']}")
         except Exception as e:
             print(f"Error cleaning up session: {str(e)}")
+
+    async def clear_neo4j(self):
+        """Clear all nodes and relationships from the Neo4j database."""
+        try:
+            with self.graph_store._driver.session() as session:
+                session.run("MATCH (n) DETACH DELETE n")
+            print("Successfully cleared Neo4j database")
+        except Exception as e:
+            print(f"Error clearing Neo4j database: {str(e)}")
+            raise
 
     async def load_doc(self, file, session):
         file_path = os.path.join(session['upload_dir'], file.filename)
@@ -178,7 +163,7 @@ class graphRAG:
             nodes=nodes,
             embed_model=self.embedding_model,
             kg_extractors=[kg_extractor],
-            property_graph_store=session['graph_store'],
+            property_graph_store=self.graph_store,
             show_progress=True,
         )
 
