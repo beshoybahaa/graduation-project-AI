@@ -241,7 +241,10 @@ class graphRAG:
         return response
 
     def QueryEngine(self, difficulty_level,storage_context):
-        self.index = PropertyGraphIndex.from_graph_store(storage_context)
+        self.index = PropertyGraphIndex.from_existing(
+            property_graph_store=storage_context.property_graph_store,
+            embed_model=self.embedding_model
+        )
         query_engine = self.index.as_query_engine(
             llm=self.llm_questions,
             show_progress=True,
