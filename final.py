@@ -83,14 +83,25 @@ class graphRAG:
             )
             
             with system_driver.session(database="system") as session:
-                result = session.run("SHOW DATABASES")
-                databases = [record["name"] for record in result]
-                print(f"Available databases: {databases}")
+                # Check if neo4j database exists
+                result = session.run("SHOW DATABASE neo4j")
+                db_info = result.single()
                 
-                if "neo4j" not in databases:
-                    print("Creating neo4j database...")
-                    session.run("CREATE DATABASE neo4j")
-                    print("Database created successfully")
+                if not db_info or db_info["state"] != "online":
+                    print("Creating and starting neo4j database...")
+                    # Create database if it doesn't exist
+                    session.run("CREATE DATABASE neo4j IF NOT EXISTS")
+                    # Start the database
+                    session.run("START DATABASE neo4j")
+                    # Wait for database to be online
+                    while True:
+                        result = session.run("SHOW DATABASE neo4j")
+                        db_info = result.single()
+                        if db_info and db_info["state"] == "online":
+                            break
+                        print("Waiting for database to start...")
+                        time.sleep(2)
+                    print("Database started successfully")
             
             system_driver.close()
             
