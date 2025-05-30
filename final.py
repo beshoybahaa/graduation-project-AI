@@ -95,18 +95,12 @@ class graphRAG:
     def clear_neo4j(self):
         """Clear all nodes and relationships from the Neo4j database."""
         try:
-            # First try to clear using APOC
-            self.graph_store.query("CALL apoc.periodic.iterate('MATCH (n) RETURN n', 'DETACH DELETE n', {batchSize: 1000})")
-            print("Successfully cleared Neo4j database using APOC")
+            # Clear the graph store using the proper method
+            self.graph_store.clear()
+            print("Successfully cleared Neo4j database")
         except Exception as e:
-            print(f"APOC clear failed, trying direct clear: {str(e)}")
-            try:
-                # Fallback to direct clear if APOC fails
-                self.graph_store.query("MATCH (n) DETACH DELETE n")
-                print("Successfully cleared Neo4j database using direct clear")
-            except Exception as e2:
-                print(f"Error clearing Neo4j database: {str(e2)}")
-                raise
+            print(f"Error clearing Neo4j database: {str(e)}")
+            raise
 
     def load_doc(self, file):
         file_path = os.path.join(self.upload_dir, file.filename)
