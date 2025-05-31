@@ -36,6 +36,7 @@ jobs:
         username: ${{ env.AZURE_VM_USERNAME }}
         key: ${{ secrets.AZURE_VM_SSH_KEY }}
         script: |
+          source llamaenv/bin/activate
           cd /home/${{ env.AZURE_VM_USERNAME }}/graduation-project-AI
           git pull
           pip install -r requirements.txt
