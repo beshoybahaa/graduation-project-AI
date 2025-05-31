@@ -381,4 +381,8 @@ async def predict(file: Annotated[UploadFile, File()], chapter_number: int = For
             content={"error": "Unexpected Error", "step": "general", "details": str(e)}
         )
 
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
     
