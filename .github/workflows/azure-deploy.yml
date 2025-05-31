@@ -40,4 +40,4 @@ jobs:
           cd /home/${{ env.AZURE_VM_USERNAME }}/graduation-project-AI
           git pull
           pip install -r requirements.txt
-          pm2 restart final || pm2 start final.py --name final 
+          pm2 restart final || pm2 start /home/${{ env.AZURE_VM_USERNAME }}/llamaenv/bin/python final.py --name final 
