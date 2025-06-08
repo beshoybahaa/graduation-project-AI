@@ -384,7 +384,8 @@ async def predict(file: Annotated[UploadFile, File()],TOCBool = bool,chapters:Op
         session = await graphrag.create_session()
         list_of_chapters_pdf = []
         if TOCBool:
-            toc = graphrag.extract_toc_from_pdf(file)
+            reader = PyPDF2.PdfReader(file)
+            toc = graphrag.extract_toc_from_pdf(reader)
             for chapter in chapters:
                 start_page, end_page = graphrag.get_subsection_range(toc, chapter)
                 list_of_chapters_pdf.append(graphrag.extract_chapter(file.filename, f"{session['storage_dir']}/{session['request_id']}_chapter_{chapter}.pdf", start_page, end_page))
@@ -425,7 +426,7 @@ async def predict(file: Annotated[UploadFile, File()],TOCBool = bool,chapters:Op
                         test = await graphrag.QueryEngine(i, session)
                         response_answer = str(test)
                         json_data = graphrag.extract_json_from_response(response_answer)
-                        json_data = graphrag.add_to_json(json_data, i, chapter_number)
+                        json_data = graphrag.add_to_json(json_data, i, chapter.number)
                         json_data_all.extend(json_data)
                         await asyncio.sleep(3)  # Use asyncio.sleep instead of time.sleep
                     print(f"Completed {i} difficulty level")
