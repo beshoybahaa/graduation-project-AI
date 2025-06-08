@@ -300,7 +300,7 @@ class graphRAG:
     
         return json_data
     
-    def extract_toc_from_pdf(reader):
+    def extract_toc_from_pdf(self, reader):
         """Extract the table of contents (TOC) from the PDF outline."""
         toc = []
         if reader.outline:
