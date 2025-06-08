@@ -327,7 +327,7 @@ class graphRAG:
                             toc.append({"title": title, "start_page": start_page, "end_page": start_page})
         return toc
     
-    def get_subsection_range(toc, choice):
+    def get_subsection_range(self, toc, choice):
         """Get the start and end page of the selected subsection."""
         if 1 <= choice <= len(toc):
             selected_item = toc[choice - 1]
@@ -345,7 +345,7 @@ class graphRAG:
             print("Invalid choice. Please try again.")
         return None, None
 
-    def extract_chapter(input_pdf, output_pdf, start_page, end_page):
+    def extract_chapter(self, input_pdf, output_pdf, start_page, end_page):
         """Extract the specified chapter and save it to a new PDF."""
         with open(input_pdf, 'rb') as file:
             reader = PyPDF2.PdfReader(file)
