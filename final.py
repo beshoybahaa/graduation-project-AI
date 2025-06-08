@@ -377,7 +377,7 @@ def index():
 async def predict(file: Annotated[UploadFile, File()],TOCBool = bool,chapters:Optional[List]=None, chapterslndexes: Optional[List[chapterslndexes]] = None):
     session = None
     try:
-
+        await file.seek(0)
         print(f"Received file: {file.filename}")
         
         # Create a new session for this request
