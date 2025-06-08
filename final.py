@@ -377,14 +377,14 @@ def index():
 async def predict(file: Annotated[UploadFile, File()],TOCBool = bool,chapters:Optional[List]=None, chapterslndexes: Optional[List[chapterslndexes]] = None):
     session = None
     try:
-        await file.seek(0)
         print(f"Received file: {file.filename}")
-        
+        await file.seek(0, 0)
         # Create a new session for this request
         session = await graphrag.create_session()
         list_of_chapters_pdf = []
         if TOCBool:
-            reader = PyPDF2.PdfReader(file)
+            
+            reader = PyPDF2.PdfReader(file.file)
             toc = graphrag.extract_toc_from_pdf(reader)
             for chapter in chapters:
                 start_page, end_page = graphrag.get_subsection_range(toc, chapter)
