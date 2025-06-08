@@ -7,7 +7,7 @@ import shutil
 import tempfile
 import time
 # from datetime import datetime
-from typing import Union, Annotated
+from typing import Union, Annotated, Optional, List
 # from math import ceil
 # from functools import partial
 
@@ -31,6 +31,7 @@ from llama_index.core.indices.property_graph import (
 )
 from llama_index.core import Settings
 from llama_index.graph_stores.neo4j import Neo4jPropertyGraphStore
+import PyPDF2
 
 # from llama_index.graph_stores.falkordb import FalkorDBPropertyGraphStore
 # from dotenv import load_dotenv
@@ -45,6 +46,11 @@ llm = Groq(
     max_retries=2
 )
 Settings.llm = llm
+
+class chapterslndexes(BaseModel):
+    number: str
+    startPage: int
+    endPage: int
 
 class graphRAG:
     embedding_model = None
@@ -195,11 +201,11 @@ class graphRAG:
             print(f"Error clearing Neo4j database: {str(e)}")
             raise
 
-    async def load_doc(self, file, session):
-        file_path = os.path.join(session['upload_dir'], file.filename)
+    async def load_doc(self, file, session,path):
+        # file_path = os.path.join(session['upload_dir'], file.filename)
         
         try:
-            with open(file_path, "wb") as buffer:
+            with open(path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
             
             documents = SimpleDirectoryReader(session['upload_dir']).load_data()
@@ -293,6 +299,65 @@ class graphRAG:
             item["chapterNo"] = chapter_number
     
         return json_data
+    
+    def extract_toc_from_pdf(reader):
+        """Extract the table of contents (TOC) from the PDF outline."""
+        toc = []
+        if reader.outline:
+            for i, item in enumerate(reader.outline):
+                if isinstance(item, dict):
+                    title = item.get("/Title", "Untitled")
+                    start_page = reader.get_destination_page_number(item) + 1  # Convert to 1-based index
+                    # Calculate end_page as the start of the next section or the end of the document
+                    if i + 1 < len(reader.outline):
+                        next_item = reader.outline[i + 1]
+                        if isinstance(next_item, dict):
+                            end_page = reader.get_destination_page_number(next_item) + 1
+                        else:
+                            end_page = len(reader.pages)
+                    else:
+                        end_page = len(reader.pages)
+                    toc.append({"title": title, "start_page": start_page, "end_page": end_page})
+                elif isinstance(item, list):
+                    # Handle nested items (subsections)
+                    for sub_item in item:
+                        if isinstance(sub_item, dict):
+                            title = sub_item.get("/Title", "Untitled")
+                            start_page = reader.get_destination_page_number(sub_item) + 1
+                            toc.append({"title": title, "start_page": start_page, "end_page": start_page})
+        return toc
+    
+    def get_subsection_range(toc, choice):
+        """Get the start and end page of the selected subsection."""
+        if 1 <= choice <= len(toc):
+            selected_item = toc[choice - 1]
+            next_selected_item = toc[choice]
+            if "start_page" in selected_item and "end_page" in selected_item:
+                return selected_item["start_page"], next_selected_item["start_page"]
+            elif "children" in selected_item:
+                print(f"Please select a subsection of {selected_item['title']}:")
+                sub_choice = int(input("Enter the number of the subsection: "))
+                return get_subsection_range(selected_item["children"], sub_choice)
+            else:
+                print("Invalid selection. Please try again.")
+        else:
+            print("Invalid choice. Please try again.")
+        return None, None
+
+    def extract_chapter(input_pdf, output_pdf, start_page, end_page):
+        """Extract the specified chapter and save it to a new PDF."""
+        with open(input_pdf, 'rb') as file:
+            reader = PyPDF2.PdfReader(file)
+            writer = PyPDF2.PdfWriter()
+
+            # Iterate through the specified pages and add them to the writer
+            for page_num in range(start_page - 1, end_page):  # Page numbers are 0-based
+                writer.add_page(reader.pages[page_num])
+
+            # Write the extracted pages to a new PDF file
+            with open(output_pdf, 'wb') as output_file:
+                writer.write(output_file)
+        return output_pdf
 
 
 app = FastAPI()
@@ -308,69 +373,79 @@ def index():
 
 # post request that takes a review (text type) and returns a sentiment score
 @app.post('/questions')
-async def predict(file: Annotated[UploadFile, File()], chapter_number: int = Form(1)):
+async def predict(file: Annotated[UploadFile, File()],TOCBool = bool,chapters:Optional[List]=None, chapterslndexes: Optional[List[chapterslndexes]] = None):
     session = None
     try:
+
         print(f"Received file: {file.filename}")
-        print(f"Chapter number: {chapter_number}")
         
         # Create a new session for this request
         session = await graphrag.create_session()
-        
-        try:
-            print("Starting document loading...")
-            document = await graphrag.load_doc(file, session)
-            print(f"Document loading completed. Number of documents: {len(document)}")
-        except Exception as e:
-            await graphrag.cleanup_session(session)
-            print(f"Error loading document: {str(e)}")
-            return JSONResponse(
-                status_code=500,
-                content={"error": "Document Loading Error", "step": "load_doc", "details": str(e)}
-            )
+        list_of_chapters_pdf = []
+        if TOCBool:
+            toc = graphrag.extract_toc_from_pdf(file)
+            for chapter in chapters:
+                start_page, end_page = graphrag.get_subsection_range(toc, chapter)
+                list_of_chapters_pdf.append(graphrag.extract_chapter(file.filename, f"{session['storage_dir']}/{session['request_id']}_chapter_{chapter}.pdf", start_page, end_page))
+        else:
+            for chapter in chapterslndexes:
+                list_of_chapters_pdf.append(graphrag.extract_chapter(file.filename, f"{session['storage_dir']}/{session['request_id']}_chapter_{chapter.number}.pdf", chapter.startPage, chapter.endPage))
 
-        try:
-            print("Starting document indexing...")
-            await graphrag.index_doc(document, session)
-            print("Document indexing completed")
-        except Exception as e:
-            await graphrag.cleanup_session(session)
-            print(f"Error indexing document: {str(e)}")
-            return JSONResponse(
-                status_code=500,
-                content={"error": "Document Indexing Error", "step": "index_doc", "details": str(e)}
-            )
-
-        json_data_all = []
-        for i in ["easy", "medium", "hard"]:
+        for chapter in list_of_chapters_pdf:
             try:
-                print(f"Generating questions for {i} difficulty...")
-                for batch in range(3):
-                    test = await graphrag.QueryEngine(i, session)
-                    response_answer = str(test)
-                    json_data = graphrag.extract_json_from_response(response_answer)
-                    json_data = graphrag.add_to_json(json_data, i, chapter_number)
-                    json_data_all.extend(json_data)
-                    await asyncio.sleep(3)  # Use asyncio.sleep instead of time.sleep
-                print(f"Completed {i} difficulty level")
+                print("Starting document loading...")
+                document = await graphrag.load_doc(file, session,chapter)
+                print(f"Document loading completed. Number of documents: {len(document)}")
             except Exception as e:
                 await graphrag.cleanup_session(session)
-                print(f"Error generating {i} difficulty questions: {str(e)}")
+                print(f"Error loading document: {str(e)}")
                 return JSONResponse(
                     status_code=500,
-                    content={
-                        "error": f"Question Generation Error for {i} difficulty",
-                        "step": "QueryEngine",
-                        "details": str(e)
-                    }
+                    content={"error": "Document Loading Error", "step": "load_doc", "details": str(e)}
                 )
-        
-        # Clean up the session after successful processing
-        await graphrag.cleanup_session(session)
+
+            try:
+                print("Starting document indexing...")
+                await graphrag.index_doc(document, session)
+                print("Document indexing completed")
+            except Exception as e:
+                await graphrag.cleanup_session(session)
+                print(f"Error indexing document: {str(e)}")
+                return JSONResponse(
+                    status_code=500,
+                    content={"error": "Document Indexing Error", "step": "index_doc", "details": str(e)}
+                )
+
+            json_data_all = []
+            for i in ["easy", "medium", "hard"]:
+                try:
+                    print(f"Generating questions for {i} difficulty...")
+                    for batch in range(3):
+                        test = await graphrag.QueryEngine(i, session)
+                        response_answer = str(test)
+                        json_data = graphrag.extract_json_from_response(response_answer)
+                        json_data = graphrag.add_to_json(json_data, i, chapter_number)
+                        json_data_all.extend(json_data)
+                        await asyncio.sleep(3)  # Use asyncio.sleep instead of time.sleep
+                    print(f"Completed {i} difficulty level")
+                except Exception as e:
+                    await graphrag.cleanup_session(session)
+                    print(f"Error generating {i} difficulty questions: {str(e)}")
+                    return JSONResponse(
+                        status_code=500,
+                        content={
+                            "error": f"Question Generation Error for {i} difficulty",
+                            "step": "QueryEngine",
+                            "details": str(e)
+                        }
+                    )
             
-        print(f"Successfully generated {len(json_data_all)} total questions")
-        return JSONResponse(content=json_data_all)
-        
+            # Clean up the session after successful processing
+            await graphrag.cleanup_session(session)
+                
+            print(f"Successfully generated {len(json_data_all)} total questions")
+            return JSONResponse(content=json_data_all)
+            
     except Exception as e:
         # Ensure session cleanup in case of unexpected errors
         if session:
