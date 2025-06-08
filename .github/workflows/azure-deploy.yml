@@ -41,4 +41,4 @@ jobs:
           git pull
           pip install -r requirements.txt
           pm2 delete final || true
-               pm2 start -f /home/${{ env.AZURE_VM_USERNAME }}/llamaenv/bin/python -- /home/${{ env.AZURE_VM_USERNAME }}/graduation-project-AI/final.py --name final
+          pm2 start -f /home/${{ env.AZURE_VM_USERNAME }}/llamaenv/bin/python --name final -- /home/${{ env.AZURE_VM_USERNAME }}/graduation-project-AI/final.py
