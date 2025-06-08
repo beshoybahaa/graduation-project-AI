@@ -201,17 +201,13 @@ class graphRAG:
             print(f"Error clearing Neo4j database: {str(e)}")
             raise
 
-    async def load_doc(self, file, session, path):
+    async def load_doc(self, file, session,path):
+        # file_path = os.path.join(session['upload_dir'], file.filename)
+        
         try:
-            # Create a copy of the file in the upload directory
-            file_path = os.path.join(session['upload_dir'], os.path.basename(path))
-            with open(file_path, "wb") as buffer:
+            with open(path, "wb") as buffer:
                 shutil.copyfileobj(file.file, buffer)
             
-            # Reset the file pointer for potential future use
-            await file.seek(0)
-            
-            # Load the document from the copied file
             documents = SimpleDirectoryReader(session['upload_dir']).load_data()
             return documents
         except Exception as e:
@@ -386,31 +382,21 @@ async def predict(file: Annotated[UploadFile, File()],TOCBool = bool,chapters:Op
         
         # Create a new session for this request
         session = await graphrag.create_session()
-        
-        # Save the uploaded file to a temporary location
-        temp_file_path = os.path.join(session['storage_dir'], file.filename)
-        with open(temp_file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        
-        # Reset the file pointer for potential future use
-        await file.seek(0)
-        
         list_of_chapters_pdf = []
         if TOCBool:
-            reader = PyPDF2.PdfReader(temp_file_path)
+            reader = PyPDF2.PdfReader(file)
             toc = graphrag.extract_toc_from_pdf(reader)
             for chapter in chapters:
                 start_page, end_page = graphrag.get_subsection_range(toc, chapter)
-                list_of_chapters_pdf.append(graphrag.extract_chapter(temp_file_path, f"{session['storage_dir']}/{session['request_id']}_chapter_{chapter}.pdf", start_page, end_page))
+                list_of_chapters_pdf.append(graphrag.extract_chapter(file.filename, f"{session['storage_dir']}/{session['request_id']}_chapter_{chapter}.pdf", start_page, end_page))
         else:
             for chapter in chapterslndexes:
-                list_of_chapters_pdf.append(graphrag.extract_chapter(temp_file_path, f"{session['storage_dir']}/{session['request_id']}_chapter_{chapter.number}.pdf", chapter.startPage, chapter.endPage))
+                list_of_chapters_pdf.append(graphrag.extract_chapter(file.filename, f"{session['storage_dir']}/{session['request_id']}_chapter_{chapter.number}.pdf", chapter.startPage, chapter.endPage))
 
-        json_data_all = []
-        for chapter_pdf in list_of_chapters_pdf:
+        for chapter in list_of_chapters_pdf:
             try:
                 print("Starting document loading...")
-                document = await graphrag.load_doc(file, session, chapter_pdf)
+                document = await graphrag.load_doc(file, session,chapter)
                 print(f"Document loading completed. Number of documents: {len(document)}")
             except Exception as e:
                 await graphrag.cleanup_session(session)
@@ -432,6 +418,7 @@ async def predict(file: Annotated[UploadFile, File()],TOCBool = bool,chapters:Op
                     content={"error": "Document Indexing Error", "step": "index_doc", "details": str(e)}
                 )
 
+            json_data_all = []
             for i in ["easy", "medium", "hard"]:
                 try:
                     print(f"Generating questions for {i} difficulty...")
@@ -439,10 +426,9 @@ async def predict(file: Annotated[UploadFile, File()],TOCBool = bool,chapters:Op
                         test = await graphrag.QueryEngine(i, session)
                         response_answer = str(test)
                         json_data = graphrag.extract_json_from_response(response_answer)
-                        chapter_number = os.path.basename(chapter_pdf).split('_')[-1].replace('.pdf', '')
-                        json_data = graphrag.add_to_json(json_data, i, chapter_number)
+                        json_data = graphrag.add_to_json(json_data, i, chapter.number)
                         json_data_all.extend(json_data)
-                        await asyncio.sleep(3)
+                        await asyncio.sleep(3)  # Use asyncio.sleep instead of time.sleep
                     print(f"Completed {i} difficulty level")
                 except Exception as e:
                     await graphrag.cleanup_session(session)
@@ -456,11 +442,11 @@ async def predict(file: Annotated[UploadFile, File()],TOCBool = bool,chapters:Op
                         }
                     )
             
-        # Clean up the session after successful processing
-        await graphrag.cleanup_session(session)
-            
-        print(f"Successfully generated {len(json_data_all)} total questions")
-        return JSONResponse(content=json_data_all)
+            # Clean up the session after successful processing
+            await graphrag.cleanup_session(session)
+                
+            print(f"Successfully generated {len(json_data_all)} total questions")
+            return JSONResponse(content=json_data_all)
             
     except Exception as e:
         # Ensure session cleanup in case of unexpected errors
