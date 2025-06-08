@@ -338,7 +338,7 @@ class graphRAG:
             elif "children" in selected_item:
                 print(f"Please select a subsection of {selected_item['title']}:")
                 sub_choice = int(input("Enter the number of the subsection: "))
-                return get_subsection_range(selected_item["children"], sub_choice)
+                return self.get_subsection_range(selected_item["children"], sub_choice)
             else:
                 print("Invalid selection. Please try again.")
         else:
