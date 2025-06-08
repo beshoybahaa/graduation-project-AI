@@ -378,7 +378,7 @@ async def predict(file: Annotated[UploadFile, File()],TOCBool = bool,chapters:Op
     session = None
     try:
         print(f"Received file: {file.filename}")
-        await file.seek(0, 0)
+        await file.seek(0)
         # Create a new session for this request
         session = await graphrag.create_session()
         list_of_chapters_pdf = []
