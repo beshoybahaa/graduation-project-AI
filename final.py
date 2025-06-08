@@ -333,6 +333,7 @@ class graphRAG:
             selected_item = toc[choice - 1]
             next_selected_item = toc[choice]
             if "start_page" in selected_item and "end_page" in selected_item:
+                print(f"the title of the selected chapter is {toc[choice]['title']}")
                 return selected_item["start_page"], next_selected_item["start_page"]
             elif "children" in selected_item:
                 print(f"Please select a subsection of {selected_item['title']}:")
