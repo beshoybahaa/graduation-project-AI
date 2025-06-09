@@ -403,7 +403,7 @@ async def predict(file: Annotated[UploadFile, File()], hasTOC: bool, chapters: O
         session = await graphrag.create_session()
         list_of_chapters_pdf = []
         
-        if hasTOC == "True":
+        if hasTOC:
             reader = PyPDF2.PdfReader(file.file)
             toc = graphrag.extract_toc_from_pdf(reader)
             if not toc:
