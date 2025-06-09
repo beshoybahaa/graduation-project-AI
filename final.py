@@ -206,8 +206,10 @@ class graphRAG:
         # file_path = os.path.join(session['upload_dir'], file.filename)
         
         try:
-            with open(path, "wb") as buffer:
-                shutil.copyfileobj(file, buffer)
+            file_path = os.path.join(session['upload_dir'], os.path.basename(path))
+            with open(file_path, "wb") as buffer:
+                content = await file.read()
+                buffer.write(content)
             
             documents = SimpleDirectoryReader(session['upload_dir']).load_data()
             return documents
@@ -480,9 +482,10 @@ async def predict(
         for chapter in list_of_chapters_pdf:
             try:
                 print("Starting document loading...")
-                file_content = open(chapter, 'rb').read()
-                file = UploadFile(file=file_content, filename=os.path.basename(chapter))
-                document = await graphrag.load_doc(file, session, chapter)
+                file = UploadFile(filename=os.path.basename(chapter))
+                with open(chapter, 'rb') as f:
+                    file.file = f
+                    document = await graphrag.load_doc(file, session, chapter)
                 print(f"Document loading completed. Number of documents: {len(document)}")
             except Exception as e:
                 await graphrag.cleanup_session(session)
