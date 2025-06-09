@@ -393,7 +393,7 @@ def download_pdf_from_url(url, save_path):
 async def predict(
     file: Optional[Annotated[UploadFile, File()]] = None,
     url: Optional[str] = None,
-    urlBool: Optional[str] = "False",
+    urlBool: Optional[str] = None,
     hasTOC: str = "False",
     chapters: Optional[List] = None,
     chapterslndexes: Optional[List[chapterslndexes]] = None
