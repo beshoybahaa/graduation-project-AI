@@ -420,7 +420,7 @@ async def predict(
         if not urlBool == "True" and filePDF is None:
             return JSONResponse(
                 status_code=400,
-                content={"error": "No file provided" + str(filePDF) + " " + str(urlBool)}
+                content={"error": "No file provided " + filePDF.filename + " " + str(urlBool)}
             )
             
         if urlBool == "True" and not url:
