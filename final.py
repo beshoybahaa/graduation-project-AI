@@ -374,7 +374,7 @@ def index():
 
 # post request that takes a review (text type) and returns a sentiment score
 @app.post('/questions')
-async def predict(file: Annotated[UploadFile, File()], hasTOC: bool, chapters: Optional[List] = None, chapterslndexes: Optional[List[chapterslndexes]] = None):
+async def predict(file: Annotated[UploadFile, File()], hasTOC: str, chapters: Optional[List], chapterslndexes: Optional[List[chapterslndexes]]):
     session = None
     try:
         # Validate input parameters
@@ -384,13 +384,13 @@ async def predict(file: Annotated[UploadFile, File()], hasTOC: bool, chapters: O
                 content={"error": "No file provided"}
             )
             
-        if hasTOC and not chapters:
+        if hasTOC == "True" and not chapters:
             return JSONResponse(
                 status_code=400,
                 content={"error": "hasTOC is True but no chapters provided"}
             )
             
-        if not hasTOC and not chapterslndexes:
+        if not hasTOC == "True" and not chapterslndexes:
             return JSONResponse(
                 status_code=400,
                 content={"error": "hasTOC is False but no chapterslndexes provided"}
@@ -403,7 +403,7 @@ async def predict(file: Annotated[UploadFile, File()], hasTOC: bool, chapters: O
         session = await graphrag.create_session()
         list_of_chapters_pdf = []
         
-        if hasTOC:
+        if hasTOC == "True":
             reader = PyPDF2.PdfReader(file.file)
             toc = graphrag.extract_toc_from_pdf(reader)
             if not toc:
