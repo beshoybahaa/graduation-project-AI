@@ -392,11 +392,11 @@ def download_pdf_from_url(url, save_path):
 @app.post('/questions')
 async def predict(
     file: Optional[Annotated[UploadFile, File()]] = None,
-    url: Optional[str] = None,
-    urlBool: Optional[str] = None,
-    hasTOC: str = "False",
-    chapters: Optional[List] = None,
-    chapterslndexes: Optional[List[chapterslndexes]] = None
+    url: Optional[str] = Form(None),
+    urlBool: Optional[str] = Form(None),
+    hasTOC: str = Form("False"),
+    chapters: Optional[List] = Form(None),
+    chapterslndexes: Optional[List[chapterslndexes]] = Form(None)
 ):
     session = None
     try:
