@@ -16,6 +16,7 @@ from typing import Union, Annotated, Optional, List
 import nest_asyncio
 from fastapi import FastAPI, UploadFile, Form, File
 from fastapi.responses import JSONResponse
+from fastapi.datastructures import SimpleUploadFile
 from pydantic import BaseModel
 
 # LlamaIndex imports
@@ -207,7 +208,7 @@ class graphRAG:
         
         try:
             with open(path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
+                shutil.copyfileobj(file, buffer)
             
             documents = SimpleDirectoryReader(session['upload_dir']).load_data()
             return documents
@@ -480,6 +481,8 @@ async def predict(
         for chapter in list_of_chapters_pdf:
             try:
                 print("Starting document loading...")
+                file = SimpleUploadFile(filename=os.path.basename(chapter))
+                file.file = open(chapter, 'rb')
                 document = await graphrag.load_doc(file, session,chapter)
                 print(f"Document loading completed. Number of documents: {len(document)}")
             except Exception as e:
