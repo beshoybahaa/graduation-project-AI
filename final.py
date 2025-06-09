@@ -393,7 +393,7 @@ def download_pdf_from_url(url, save_path):
 async def predict(
     file: Optional[Annotated[UploadFile, File()]] = None,
     url: Optional[str] = None,
-    urlBool: Optional[bool] = False,
+    urlBool: Optional[str] = "False",
     hasTOC: str = "False",
     chapters: Optional[List] = None,
     chapterslndexes: Optional[List[chapterslndexes]] = None
@@ -401,13 +401,13 @@ async def predict(
     session = None
     try:
         # Validate input parameters
-        if not urlBool and not file:
+        if not urlBool == "True" and not file:
             return JSONResponse(
                 status_code=400,
                 content={"error": "No file provided"}
             )
             
-        if urlBool and not url:
+        if urlBool == "True" and not url:
             return JSONResponse(
                 status_code=400,
                 content={"error": "urlBool is True but no URL provided"}
@@ -429,7 +429,7 @@ async def predict(
         session = await graphrag.create_session()
         list_of_chapters_pdf = []
         
-        if urlBool:
+        if urlBool == "True":
             # Download PDF from URL
             temp_pdf_path = os.path.join(session['storage_dir'], f"{session['request_id']}_downloaded.pdf")
             if not download_pdf_from_url(url, temp_pdf_path):
