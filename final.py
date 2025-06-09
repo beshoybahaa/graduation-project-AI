@@ -6,6 +6,7 @@ import re
 import shutil
 import tempfile
 import time
+import requests
 # from datetime import datetime
 from typing import Union, Annotated, Optional, List
 # from math import ceil
@@ -371,17 +372,45 @@ graphrag = graphRAG()
 def index():
     return {'message': 'Quizaty API!'}
 
+def download_pdf_from_url(url, save_path):
+    """Download a PDF from a URL and save it to the specified path."""
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()  # Raise an error for bad status codes
+        with open(save_path, 'wb') as file:
+            file.write(response.content)
+        print(f"PDF downloaded and saved to {save_path}")
+        return True
+    except Exception as e:
+        print(f"Failed to download PDF: {e}")
+        return False
 
 # post request that takes a review (text type) and returns a sentiment score
 @app.post('/questions')
-async def predict(file: Annotated[UploadFile, File()], hasTOC: str, chapters: Optional[List], chapterslndexes: Optional[List[chapterslndexes]]):
+async def predict(
+    file: Optional[Annotated[UploadFile, File()]] = None,
+    url: Optional[str] = None,
+    urlBool: Optional[bool] = False,
+    hasTOC: str = "False",
+    chapters: Optional[List] = None,
+    chapterslndexes: Optional[List[chapterslndexes]] = None
+):
     session = None
     try:
         # Validate input parameters
-        if not file:
+        if not urlBool and not file:
             return JSONResponse(
                 status_code=400,
                 content={"error": "No file provided"}
+            )
+            
+        if urlBool and not url:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "urlBool is True but no URL provided"}
             )
             
         if hasTOC == "True" and not chapters:
@@ -396,15 +425,28 @@ async def predict(file: Annotated[UploadFile, File()], hasTOC: str, chapters: Op
                 content={"error": "hasTOC is False but no chapterslndexes provided"}
             )
 
-        print(f"Received file: {file.filename}")
-        await file.seek(0)
-        
         # Create a new session for this request
         session = await graphrag.create_session()
         list_of_chapters_pdf = []
         
+        if urlBool:
+            # Download PDF from URL
+            temp_pdf_path = os.path.join(session['storage_dir'], f"{session['request_id']}_downloaded.pdf")
+            if not download_pdf_from_url(url, temp_pdf_path):
+                await graphrag.cleanup_session(session)
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "Failed to download PDF from URL"}
+                )
+            file_path = temp_pdf_path
+        else:
+            # Save uploaded file
+            file_path = os.path.join(session['storage_dir'], file.filename)
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(file.file, buffer)
+        
         if hasTOC == "True":
-            reader = PyPDF2.PdfReader(file.file)
+            reader = PyPDF2.PdfReader(file_path)
             toc = graphrag.extract_toc_from_pdf(reader)
             if not toc:
                 return JSONResponse(
@@ -419,7 +461,7 @@ async def predict(file: Annotated[UploadFile, File()], hasTOC: str, chapters: Op
                         status_code=400,
                         content={"error": f"Invalid chapter range for chapter {chapter}"}
                     )
-                list_of_chapters_pdf.append(graphrag.extract_chapter(file.filename, f"{session['storage_dir']}/{session['request_id']}_chapter_{chapter}.pdf", start_page, end_page))
+                list_of_chapters_pdf.append(graphrag.extract_chapter(file_path, f"{session['storage_dir']}/{session['request_id']}_chapter_{chapter}.pdf", start_page, end_page))
         else:
             for chapter in chapterslndexes:
                 if not hasattr(chapter, 'number') or not hasattr(chapter, 'startPage') or not hasattr(chapter, 'endPage'):
@@ -427,7 +469,7 @@ async def predict(file: Annotated[UploadFile, File()], hasTOC: str, chapters: Op
                         status_code=400,
                         content={"error": "Invalid chapter index format"}
                     )
-                list_of_chapters_pdf.append(graphrag.extract_chapter(file.filename, f"{session['storage_dir']}/{session['request_id']}_chapter_{chapter.number}.pdf", chapter.startPage, chapter.endPage))
+                list_of_chapters_pdf.append(graphrag.extract_chapter(file_path, f"{session['storage_dir']}/{session['request_id']}_chapter_{chapter.number}.pdf", chapter.startPage, chapter.endPage))
 
         if not list_of_chapters_pdf:
             return JSONResponse(
