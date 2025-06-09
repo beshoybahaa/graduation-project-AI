@@ -206,12 +206,12 @@ class graphRAG:
         # file_path = os.path.join(session['upload_dir'], file.filename)
         
         try:
-            file_path = os.path.join(session['upload_dir'], os.path.basename(path))
-            with open(file_path, "wb") as buffer:
-                content = await file.read()
-                buffer.write(content)
+            # file_path = os.path.join(session['upload_dir'], os.path.basename(path))
+            # with open(file_path, "wb") as buffer:
+            #     content = await file.read()
+            #     buffer.write(content)
             
-            documents = SimpleDirectoryReader(session['upload_dir']).load_data()
+            documents = SimpleDirectoryReader(session['storage_dir']).load_data()
             return documents
         except Exception as e:
             print(f"Error loading document: {str(e)}")
