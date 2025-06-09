@@ -493,6 +493,7 @@ async def predict(
                 content={"error": "No chapters were processed"}
             )
 
+        json_data_all = []
         for chapter in list_of_chapters_pdf:
             try:
                 print("Starting document loading...")
@@ -524,7 +525,7 @@ async def predict(
                     content={"error": "Document Indexing Error", "step": "index_doc", "details": str(e)}
                 )
 
-            json_data_all = []
+            
             for i in ["easy", "medium", "hard"]:
                 try:
                     print(f"Generating questions for {i} difficulty...")
@@ -547,12 +548,11 @@ async def predict(
                             "details": str(e)
                         }
                     )
+        # Clean up the session after successful processing
+        await graphrag.cleanup_session(session)
             
-            # Clean up the session after successful processing
-            await graphrag.cleanup_session(session)
-                
-            print(f"Successfully generated {len(json_data_all)} total questions")
-            return JSONResponse(content=json_data_all)
+        print(f"Successfully generated {len(json_data_all)} total questions")
+        return JSONResponse(content=json_data_all)
             
     except Exception as e:
         # Ensure session cleanup in case of unexpected errors
