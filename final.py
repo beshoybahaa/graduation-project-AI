@@ -416,7 +416,7 @@ async def predict(
         if hasTOC == "True" and not chapters:
             return JSONResponse(
                 status_code=400,
-                content={"error": "hasTOC is True but no chapters provided"}
+                content={"error": "hasTOC is True but no chapters provided " + str(chapters)}
             )
             
         if not hasTOC == "True" and not chapterslndexes:
