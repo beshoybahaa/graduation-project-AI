@@ -401,7 +401,7 @@ async def predict(
     session = None
     try:
         # Validate input parameters
-        if not urlBool == "True" and not file:
+        if not urlBool == "True" and file is None:
             return JSONResponse(
                 status_code=400,
                 content={"error": "No file provided"}
