@@ -93,6 +93,7 @@ class graphRAG:
         session = {
             'storage_dir': tempfile.mkdtemp(),
             'upload_dir': tempfile.mkdtemp(),
+            'file_dir': tempfile.mkdtemp(),
             'index': None,
             'storage_context': None,
             'request_id': None,
@@ -149,6 +150,8 @@ class graphRAG:
                 shutil.rmtree(session['storage_dir'])
             if os.path.exists(session['upload_dir']):
                 shutil.rmtree(session['upload_dir'])
+            if os.path.exists(session['file_dir']):
+                shutil.rmtree(session['file_dir'])
                 
             # Clean up database
             from neo4j import GraphDatabase
@@ -202,19 +205,30 @@ class graphRAG:
             print(f"Error clearing Neo4j database: {str(e)}")
             raise
 
-    async def load_doc(self, file, session,path):
-        # file_path = os.path.join(session['upload_dir'], file.filename)
-        
+    async def load_doc(self, file, session, path):
         try:
-            file_path = os.path.join(session['upload_dir'], os.path.basename(path))
+            # Create a unique filename in the file_dir
+            file_name = os.path.basename(path)
+            file_path = os.path.join(session['file_dir'], file_name)
+            
+            # Write the file content to file_dir
             with open(file_path, "wb") as buffer:
                 content = await file.read()
                 buffer.write(content)
             
-            documents = SimpleDirectoryReader(session['upload_dir']).load_data()
+            # Read the document from file_dir
+            documents = SimpleDirectoryReader(session['file_dir']).load_data()
+            
+            # Clean up the file after reading
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            
             return documents
         except Exception as e:
             print(f"Error loading document: {str(e)}")
+            # Clean up file in case of error
+            if os.path.exists(file_path):
+                os.remove(file_path)
             raise
 
     async def index_doc(self, doc, session):
