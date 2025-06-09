@@ -374,24 +374,66 @@ def index():
 
 # post request that takes a review (text type) and returns a sentiment score
 @app.post('/questions')
-async def predict(file: Annotated[UploadFile, File()],TOCBool = bool,chapters:Optional[List]=None, chapterslndexes: Optional[List[chapterslndexes]] = None):
+async def predict(file: Annotated[UploadFile, File()], TOCBool: bool = False, chapters: Optional[List] = None, chapterslndexes: Optional[List[chapterslndexes]] = None):
     session = None
     try:
+        # Validate input parameters
+        if not file:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "No file provided"}
+            )
+            
+        if TOCBool and not chapters:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "TOCBool is True but no chapters provided"}
+            )
+            
+        if not TOCBool and not chapterslndexes:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "TOCBool is False but no chapterslndexes provided"}
+            )
+
         print(f"Received file: {file.filename}")
         await file.seek(0)
+        
         # Create a new session for this request
         session = await graphrag.create_session()
         list_of_chapters_pdf = []
+        
         if TOCBool:
-            
             reader = PyPDF2.PdfReader(file.file)
             toc = graphrag.extract_toc_from_pdf(reader)
+            if not toc:
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "Could not extract table of contents from PDF"}
+                )
+                
             for chapter in chapters:
                 start_page, end_page = graphrag.get_subsection_range(toc, chapter)
+                if start_page is None or end_page is None:
+                    return JSONResponse(
+                        status_code=400,
+                        content={"error": f"Invalid chapter range for chapter {chapter}"}
+                    )
                 list_of_chapters_pdf.append(graphrag.extract_chapter(file.filename, f"{session['storage_dir']}/{session['request_id']}_chapter_{chapter}.pdf", start_page, end_page))
         else:
             for chapter in chapterslndexes:
+                if not hasattr(chapter, 'number') or not hasattr(chapter, 'startPage') or not hasattr(chapter, 'endPage'):
+                    return JSONResponse(
+                        status_code=400,
+                        content={"error": "Invalid chapter index format"}
+                    )
                 list_of_chapters_pdf.append(graphrag.extract_chapter(file.filename, f"{session['storage_dir']}/{session['request_id']}_chapter_{chapter.number}.pdf", chapter.startPage, chapter.endPage))
+
+        if not list_of_chapters_pdf:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "No chapters were processed"}
+            )
 
         for chapter in list_of_chapters_pdf:
             try:
