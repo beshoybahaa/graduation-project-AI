@@ -374,7 +374,7 @@ def index():
 
 # post request that takes a review (text type) and returns a sentiment score
 @app.post('/questions')
-async def predict(file: Annotated[UploadFile, File()], TOCBool: bool = False, chapters: Optional[List] = None, chapterslndexes: Optional[List[chapterslndexes]] = None):
+async def predict(file: Annotated[UploadFile, File()], TOCBool: str, chapters: Optional[List] = None, chapterslndexes: Optional[List[chapterslndexes]] = None):
     session = None
     try:
         # Validate input parameters
@@ -403,7 +403,7 @@ async def predict(file: Annotated[UploadFile, File()], TOCBool: bool = False, ch
         session = await graphrag.create_session()
         list_of_chapters_pdf = []
         
-        if TOCBool:
+        if TOCBool == "True":
             reader = PyPDF2.PdfReader(file.file)
             toc = graphrag.extract_toc_from_pdf(reader)
             if not toc:
