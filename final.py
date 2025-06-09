@@ -477,7 +477,7 @@ async def predict(
                         status_code=400,
                         content={"error": f"Invalid chapter range for chapter {chapter}"}
                     )
-                list_of_chapters_pdf.append(graphrag.extract_chapter(file_path, f"{session['storage_dir']}/{session['request_id']}_chapter_{chapter}.pdf", start_page, end_page))
+                list_of_chapters_pdf.append({"chapter": chapter, "pdf": graphrag.extract_chapter(file_path, f"{session['storage_dir']}/{session['request_id']}_chapter_{chapter}.pdf", start_page, end_page)})
         else:
             for chapter in chapterslndexes:
                 if not hasattr(chapter, 'number') or not hasattr(chapter, 'startPage') or not hasattr(chapter, 'endPage'):
@@ -485,7 +485,7 @@ async def predict(
                         status_code=400,
                         content={"error": "Invalid chapter index format"}
                     )
-                list_of_chapters_pdf.append(graphrag.extract_chapter(file_path, f"{session['storage_dir']}/{session['request_id']}_chapter_{chapter.number}.pdf", chapter.startPage, chapter.endPage))
+                list_of_chapters_pdf.append({"chapter": chapter.number, "pdf": graphrag.extract_chapter(file_path, f"{session['storage_dir']}/{session['request_id']}_chapter_{chapter.number}.pdf", chapter.startPage, chapter.endPage)})
 
         if not list_of_chapters_pdf:
             return JSONResponse(
@@ -497,9 +497,9 @@ async def predict(
             try:
                 print("Starting document loading...")
                 # Create a proper UploadFile object with file handle
-                with open(chapter, 'rb') as f:
+                with open(chapter['pdf'], 'rb') as f:
                     file = UploadFile(
-                        filename=os.path.basename(chapter),
+                        filename=os.path.basename(chapter['pdf']),
                         file=f
                     )
                     document = await graphrag.load_doc(file, session, chapter)
@@ -532,7 +532,7 @@ async def predict(
                         test = await graphrag.QueryEngine(i, session)
                         response_answer = str(test)
                         json_data = graphrag.extract_json_from_response(response_answer)
-                        json_data = graphrag.add_to_json(json_data, i, chapter.number)
+                        json_data = graphrag.add_to_json(json_data, i, chapter['chapter'])
                         json_data_all.extend(json_data)
                         await asyncio.sleep(3)  # Use asyncio.sleep instead of time.sleep
                     print(f"Completed {i} difficulty level")
