@@ -407,7 +407,7 @@ def download_pdf_from_url(url, save_path):
 # post request that takes a review (text type) and returns a sentiment score
 @app.post('/questions')
 async def predict(
-    file: Optional[Annotated[UploadFile, File()]] = None,
+    filePDF: Optional[Annotated[UploadFile, File()]] = None,
     url: Optional[str] = Form(None),
     urlBool: Optional[str] = Form(None),
     hasTOC: str = Form("False"),
@@ -417,10 +417,10 @@ async def predict(
     session = None
     try:
         # Validate input parameters
-        if not urlBool == "True" and file is None:
+        if not urlBool == "True" and filePDF is None:
             return JSONResponse(
                 status_code=400,
-                content={"error": "No file provided" + str(file) + " " + str(urlBool)}
+                content={"error": "No file provided" + str(filePDF) + " " + str(urlBool)}
             )
             
         if urlBool == "True" and not url:
@@ -457,9 +457,9 @@ async def predict(
             file_path = temp_pdf_path
         else:
             # Save uploaded file
-            file_path = os.path.join(session['storage_dir'], file.filename)
+            file_path = os.path.join(session['storage_dir'], filePDF.filename)
             with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(file.file, buffer)
+                shutil.copyfileobj(filePDF.file, buffer)
         
         if hasTOC == "True":
             reader = PyPDF2.PdfReader(file_path)
@@ -563,6 +563,10 @@ async def predict(
             status_code=500,
             content={"error": "Unexpected Error", "step": "general", "details": str(e)}
         )
+
+@app.post("/test-upload")
+async def test_upload(filePDF: UploadFile = File(...)):
+    return {"filename": filePDF.filename}
 
 if __name__ == "__main__":
     import uvicorn
