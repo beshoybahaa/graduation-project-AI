@@ -500,8 +500,7 @@ async def predict(
                 with open(chapter, 'rb') as f:
                     file = UploadFile(
                         filename=os.path.basename(chapter),
-                        file=f,
-                        content_type="application/pdf"
+                        file=f
                     )
                     document = await graphrag.load_doc(file, session, chapter)
                 print(f"Document loading completed. Number of documents: {len(document)}")
