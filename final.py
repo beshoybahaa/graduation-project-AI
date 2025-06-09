@@ -135,6 +135,8 @@ class graphRAG:
                 shutil.rmtree(session['storage_dir'])
             if os.path.exists(session['upload_dir']):
                 shutil.rmtree(session['upload_dir'])
+            if os.path.exists(session['file_dir']):
+                shutil.rmtree(session['file_dir'])
             raise Exception(f"Failed to create session: {str(e)}")
 
     async def cleanup_session(self, session):
