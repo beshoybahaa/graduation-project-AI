@@ -407,7 +407,7 @@ def download_pdf_from_url(url, save_path):
 # post request that takes a review (text type) and returns a sentiment score
 @app.post('/questions')
 async def predict(
-    filePDF: Optional[Annotated[UploadFile, File()]] = None,
+    filePDF: Annotated[UploadFile | None, File()] = None,
     url: Optional[str] = Form(None),
     urlBool: Optional[str] = Form(None),
     hasTOC: str = Form("False"),
@@ -420,7 +420,7 @@ async def predict(
         if not urlBool == "True" and filePDF is None:
             return JSONResponse(
                 status_code=400,
-                content={"error": "No file provided " + filePDF.filename + " " + str(urlBool)}
+                content={"error": "No file provided " + str(filePDF) + " " + str(urlBool)}
             )
             
         if urlBool == "True" and not url:
