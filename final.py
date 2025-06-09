@@ -395,7 +395,7 @@ async def predict(
     url: Optional[str] = Form(None),
     urlBool: Optional[str] = Form(None),
     hasTOC: str = Form("False"),
-    chapters: Optional[List] = Form(None),
+    chapters: Optional[List[int]] = Form(None),
     chapterslndexes: Optional[List[chapterslndexes]] = Form(None)
 ):
     session = None
