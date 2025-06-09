@@ -211,7 +211,8 @@ class graphRAG:
             #     content = await file.read()
             #     buffer.write(content)
             
-            documents = SimpleDirectoryReader(session['storage_dir']).load_data()
+            # documents = SimpleDirectoryReader(session['upload_dir']).load_data()
+            documents = SimpleDirectoryReader(path).load_data()
             return documents
         except Exception as e:
             print(f"Error loading document: {str(e)}")
@@ -479,63 +480,60 @@ async def predict(
                 content={"error": "No chapters were processed"}
             )
 
-        for chapter in list_of_chapters_pdf:
-            try:
-                print("Starting document loading...")
-                file = UploadFile(filename=os.path.basename(chapter))
-                with open(chapter, 'rb') as f:
-                    file.file = f
-                    document = await graphrag.load_doc(file, session, chapter)
-                print(f"Document loading completed. Number of documents: {len(document)}")
-            except Exception as e:
-                await graphrag.cleanup_session(session)
-                print(f"Error loading document: {str(e)}")
-                return JSONResponse(
-                    status_code=500,
-                    content={"error": "Document Loading Error", "step": "load_doc", "details": str(e)}
-                )
-
-            try:
-                print("Starting document indexing...")
-                await graphrag.index_doc(document, session)
-                print("Document indexing completed")
-            except Exception as e:
-                await graphrag.cleanup_session(session)
-                print(f"Error indexing document: {str(e)}")
-                return JSONResponse(
-                    status_code=500,
-                    content={"error": "Document Indexing Error", "step": "index_doc", "details": str(e)}
-                )
-
-            json_data_all = []
-            for i in ["easy", "medium", "hard"]:
-                try:
-                    print(f"Generating questions for {i} difficulty...")
-                    for batch in range(3):
-                        test = await graphrag.QueryEngine(i, session)
-                        response_answer = str(test)
-                        json_data = graphrag.extract_json_from_response(response_answer)
-                        json_data = graphrag.add_to_json(json_data, i, chapter.number)
-                        json_data_all.extend(json_data)
-                        await asyncio.sleep(3)  # Use asyncio.sleep instead of time.sleep
-                    print(f"Completed {i} difficulty level")
-                except Exception as e:
-                    await graphrag.cleanup_session(session)
-                    print(f"Error generating {i} difficulty questions: {str(e)}")
-                    return JSONResponse(
-                        status_code=500,
-                        content={
-                            "error": f"Question Generation Error for {i} difficulty",
-                            "step": "QueryEngine",
-                            "details": str(e)
-                        }
-                    )
-            
-            # Clean up the session after successful processing
+        # for chapter in list_of_chapters_pdf:
+        try:
+            print("Starting document loading...")
+            document = await graphrag.load_doc(file, session, session["storage_dir"])
+            print(f"Document loading completed. Number of documents: {len(document)}")
+        except Exception as e:
             await graphrag.cleanup_session(session)
-                
-            print(f"Successfully generated {len(json_data_all)} total questions")
-            return JSONResponse(content=json_data_all)
+            print(f"Error loading document: {str(e)}")
+            return JSONResponse(
+                status_code=500,
+                content={"error": "Document Loading Error", "step": "load_doc", "details": str(e)}
+            )
+
+        try:
+            print("Starting document indexing...")
+            await graphrag.index_doc(document, session)
+            print("Document indexing completed")
+        except Exception as e:
+            await graphrag.cleanup_session(session)
+            print(f"Error indexing document: {str(e)}")
+            return JSONResponse(
+                status_code=500,
+                content={"error": "Document Indexing Error", "step": "index_doc", "details": str(e)}
+            )
+
+        json_data_all = []
+        for i in ["easy", "medium", "hard"]:
+            try:
+                print(f"Generating questions for {i} difficulty...")
+                for batch in range(3):
+                    test = await graphrag.QueryEngine(i, session)
+                    response_answer = str(test)
+                    json_data = graphrag.extract_json_from_response(response_answer)
+                    json_data = graphrag.add_to_json(json_data, i, chapter.number)
+                    json_data_all.extend(json_data)
+                    await asyncio.sleep(3)  # Use asyncio.sleep instead of time.sleep
+                print(f"Completed {i} difficulty level")
+            except Exception as e:
+                await graphrag.cleanup_session(session)
+                print(f"Error generating {i} difficulty questions: {str(e)}")
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "error": f"Question Generation Error for {i} difficulty",
+                        "step": "QueryEngine",
+                        "details": str(e)
+                    }
+                )
+        
+        # Clean up the session after successful processing
+        await graphrag.cleanup_session(session)
+            
+        print(f"Successfully generated {len(json_data_all)} total questions")
+        return JSONResponse(content=json_data_all)
             
     except Exception as e:
         # Ensure session cleanup in case of unexpected errors
