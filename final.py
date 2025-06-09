@@ -552,7 +552,14 @@ async def predict(
         await graphrag.cleanup_session(session)
             
         print(f"Successfully generated {len(json_data_all)} total questions")
-        return JSONResponse(content=json_data_all)
+        print(f"Response size: {len(str(json_data_all))} bytes")
+        return JSONResponse(
+            content=json_data_all,
+            headers={
+                "Content-Type": "application/json",
+                "Transfer-Encoding": "chunked"
+            }
+        )
             
     except Exception as e:
         # Ensure session cleanup in case of unexpected errors
