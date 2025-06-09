@@ -480,9 +480,9 @@ async def predict(
         for chapter in list_of_chapters_pdf:
             try:
                 print("Starting document loading...")
-                file = UploadFile(filename=os.path.basename(chapter))
-                file.file = open(chapter, 'rb')
-                document = await graphrag.load_doc(file, session,chapter)
+                with open(chapter, 'rb') as f:
+                    file = UploadFile(file=f, filename=os.path.basename(chapter))
+                    document = await graphrag.load_doc(file, session, chapter)
                 print(f"Document loading completed. Number of documents: {len(document)}")
             except Exception as e:
                 await graphrag.cleanup_session(session)
