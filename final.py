@@ -662,6 +662,80 @@ async def generate_questions(filePDF: UploadFile = File(...)):
             content={"error": "Unexpected Error", "details": str(e)}
         )
 
+class TextInput(BaseModel):
+    text: str
+
+@app.post('/text-questions')
+async def generate_text_questions(text_input: TextInput):
+    session = None
+    try:
+        # Create a new session for this request
+        session = await graphrag.create_session()
+        
+        try:
+            print("Starting document processing...")
+            # Create a Document from the text input
+            document = [Document(text=text_input.text)]
+            print("Document processing completed")
+        except Exception as e:
+            await graphrag.cleanup_session(session)
+            print(f"Error processing text: {str(e)}")
+            return JSONResponse(
+                status_code=500,
+                content={"error": "Text Processing Error", "details": str(e)}
+            )
+
+        try:
+            print("Starting document indexing...")
+            await graphrag.index_doc(document, session)
+            print("Document indexing completed")
+        except Exception as e:
+            await graphrag.cleanup_session(session)
+            print(f"Error indexing document: {str(e)}")
+            return JSONResponse(
+                status_code=500,
+                content={"error": "Document Indexing Error", "details": str(e)}
+            )
+
+        try:
+            print("Generating easy questions...")
+            test = await graphrag.QueryEngine("easy", session)
+            response_answer = str(test)
+            json_data = graphrag.extract_json_from_response(response_answer)
+            json_data = graphrag.add_to_json(json_data, "easy", 1)  # Using chapter 1 as default
+            print("Completed question generation")
+        except Exception as e:
+            await graphrag.cleanup_session(session)
+            print(f"Error generating questions: {str(e)}")
+            return JSONResponse(
+                status_code=500,
+                content={
+                    "error": "Question Generation Error",
+                    "details": str(e)
+                }
+            )
+
+        # Clean up the session after successful processing
+        await graphrag.cleanup_session(session)
+            
+        print(f"Successfully generated {len(json_data)} questions")
+        return JSONResponse(
+            content=json_data,
+            headers={
+                "Content-Type": "application/json"
+            }
+        )
+            
+    except Exception as e:
+        # Ensure session cleanup in case of unexpected errors
+        if session:
+            await graphrag.cleanup_session(session)
+        print(f"Unexpected error: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Unexpected Error", "details": str(e)}
+        )
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
