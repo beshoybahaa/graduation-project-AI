@@ -528,24 +528,24 @@ async def predict(
                 )
 
             
-            for i in ["easy", "medium", "hard"]:
+            for difficulty in ["easy", "medium", "hard"]:
                 try:
-                    print(f"Generating questions for {i} difficulty...")
-                    for batch in range(3):
-                        test = await graphrag.QueryEngine(i, session)
+                    print(f"Generating questions for {difficulty} difficulty...")
+                    for batch in range(3):  # Generate 3 batches of questions for each difficulty
+                        test = await graphrag.QueryEngine(difficulty, session)
                         response_answer = str(test)
                         json_data = graphrag.extract_json_from_response(response_answer)
-                        json_data = graphrag.add_to_json(json_data, i, chapter[0])
+                        json_data = graphrag.add_to_json(json_data, difficulty, chapter[0])
                         json_data_all.extend(json_data)
-                        await asyncio.sleep(3)  # Use asyncio.sleep instead of time.sleep
-                    print(f"Completed {i} difficulty level")
+                        await asyncio.sleep(3)  # Add delay between batches
+                    print(f"Completed {difficulty} difficulty level")
                 except Exception as e:
                     await graphrag.cleanup_session(session)
-                    print(f"Error generating {i} difficulty questions: {str(e)}")
+                    print(f"Error generating {difficulty} difficulty questions: {str(e)}")
                     return JSONResponse(
                         status_code=500,
                         content={
-                            "error": f"Question Generation Error for {i} difficulty",
+                            "error": f"Question Generation Error for {difficulty} difficulty",
                             "step": "QueryEngine",
                             "details": str(e)
                         }
@@ -576,6 +576,91 @@ async def predict(
 @app.post("/test-upload")
 async def test_upload(filePDF: UploadFile = File(...)):
     return {"filename": filePDF.filename}
+
+@app.post('/survey-questions')
+async def generate_questions(filePDF: UploadFile = File(...)):
+    session = None
+    try:
+        # Create a new session for this request
+        session = await graphrag.create_session()
+        
+        # Save uploaded file
+        file_path = os.path.join(session['storage_dir'], filePDF.filename)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(filePDF.file, buffer)
+        
+        try:
+            print("Starting document loading...")
+            # Create a proper UploadFile object with file handle
+            with open(file_path, 'rb') as f:
+                file = UploadFile(
+                    filename=os.path.basename(file_path),
+                    file=f
+                )
+                document = await graphrag.load_doc(file, session, file_path)
+            print(f"Document loading completed. Number of documents: {len(document)}")
+        except Exception as e:
+            await graphrag.cleanup_session(session)
+            print(f"Error loading document: {str(e)}")
+            return JSONResponse(
+                status_code=500,
+                content={"error": "Document Loading Error", "details": str(e)}
+            )
+
+        try:
+            print("Starting document indexing...")
+            await graphrag.index_doc(document, session)
+            print("Document indexing completed")
+        except Exception as e:
+            await graphrag.cleanup_session(session)
+            print(f"Error indexing document: {str(e)}")
+            return JSONResponse(
+                status_code=500,
+                content={"error": "Document Indexing Error", "details": str(e)}
+            )
+
+        json_data_all = []
+        for difficulty in ["easy", "medium", "hard"]:
+            try:
+                print(f"Generating questions for {difficulty} difficulty...")
+                test = await graphrag.QueryEngine(difficulty, session)
+                response_answer = str(test)
+                json_data = graphrag.extract_json_from_response(response_answer)
+                json_data = graphrag.add_to_json(json_data, difficulty, 1)  # Using chapter 1 as default
+                json_data_all.extend(json_data)
+                await asyncio.sleep(3)  # Add delay between batches
+                print(f"Completed {difficulty} difficulty level")
+            except Exception as e:
+                await graphrag.cleanup_session(session)
+                print(f"Error generating {difficulty} difficulty questions: {str(e)}")
+                return JSONResponse(
+                    status_code=500,
+                    content={
+                        "error": f"Question Generation Error for {difficulty} difficulty",
+                        "details": str(e)
+                    }
+                )
+
+        # Clean up the session after successful processing
+        await graphrag.cleanup_session(session)
+            
+        print(f"Successfully generated {len(json_data_all)} questions")
+        return JSONResponse(
+            content=json_data_all,
+            headers={
+                "Content-Type": "application/json"
+            }
+        )
+            
+    except Exception as e:
+        # Ensure session cleanup in case of unexpected errors
+        if session:
+            await graphrag.cleanup_session(session)
+        print(f"Unexpected error: {str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Unexpected Error", "details": str(e)}
+        )
 
 if __name__ == "__main__":
     import uvicorn
