@@ -50,8 +50,8 @@ Settings.llm = llm
 
 class chapterslndexesObj(BaseModel):
     number: str
-    startPage: int
-    endPage: int
+    startPage: str
+    endPage: str
 
 class graphRAG:
     embedding_model = None
