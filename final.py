@@ -533,7 +533,7 @@ async def predict(
                     )
                 list_of_chapters_pdf.append([chapter, graphrag.extract_chapter(file_path, f"{session['storage_dir']}/{session['request_id']}_chapter_{chapter}.pdf", start_page, end_page)])
         else:
-            for chapter in chaptersIndexes:
+            for chapter in chapters_indexes_parsed:
                 if not hasattr(chapter, 'number') or not hasattr(chapter, 'startPage') or not hasattr(chapter, 'endPage'):
                     return JSONResponse(
                         status_code=400,
