@@ -1,0 +1,397 @@
+GRAPH RAG IMPLEMENTATION DOCUMENTATION
+=====================================
+
+1. SYSTEM OVERVIEW
+------------------
+The GraphRAG system is a sophisticated question generation system that combines knowledge graphs with Retrieval-Augmented Generation (RAG) to create high-quality multiple-choice questions from various input sources. The system is built using FastAPI and leverages Neo4j for graph storage.
+
+2. CORE COMPONENTS
+-----------------
+
+2.1 GraphRAG Class
+-----------------
+The main class that orchestrates the question generation process. Here's the detailed explanation of the class initialization:
+
+```python
+class graphRAG:
+    # Class-level variables to store global state
+    embedding_model = None  # Stores the HuggingFace embedding model instance
+    llm = None            # Stores the main language model instance
+    index = None          # Stores the vector store index
+    query_engine = None   # Stores the query engine instance
+    graph_store = None    # Stores the Neo4j graph store instance
+    storage_context = None # Stores the storage context for indices
+    active_sessions = {}  # Dictionary to track all active processing sessions
+        
+    def __init__(self):
+        # Initialize the embedding model using HuggingFace's sentence transformer
+        # This model converts text into vector embeddings for semantic search
+        self.embedding_model = HuggingFaceEmbedding(
+            model_name="sentence-transformers/all-MiniLM-L6-v2"
+        )
+        
+        # Initialize the main Groq LLM for general processing
+        # This model handles the core language understanding tasks
+        self.llm_groq = Groq(
+            model="deepseek-r1-distill-llama-70b",  # Using a 70B parameter model
+            api_key="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",
+            max_retries=2  # Number of retry attempts for failed API calls
+        )
+        
+        # Initialize a separate Groq LLM specifically for question generation
+        # This separation allows for different configurations for different tasks
+        self.llm_questions = Groq(
+            model="deepseek-r1-distill-llama-70b",
+            api_key="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",
+            max_retries=2
+        )
+```
+
+2.2 Session Management
+---------------------
+The system implements robust session management to handle multiple concurrent requests. Here's a detailed explanation of the session creation process:
+
+```python
+async def create_session(self):
+    # Create a new session dictionary with temporary directories and metadata
+    session = {
+        'storage_dir': tempfile.mkdtemp(),  # Directory for storing processed data
+        'upload_dir': tempfile.mkdtemp(),   # Directory for temporary file uploads
+        'file_dir': tempfile.mkdtemp(),     # Directory for document processing
+        'index': None,                      # Will store the document index
+        'storage_context': None,            # Will store the storage context
+        'request_id': None,                 # Unique identifier for the session
+        'created_at': time.time(),          # Timestamp of session creation
+        'last_accessed': time.time()        # Timestamp of last access
+    }
+    
+    # Generate a unique request ID for the session
+    # This ID will be used to create a separate Neo4j database
+    request_id = str(uuid4())[:8]  # Take first 8 characters of UUID
+    request_id = f"db{str(request_id).replace('-', '')}"  # Format as database name
+    
+    # Initialize Neo4j connection for the new session
+    # This creates a separate database for each session to ensure isolation
+    system_driver = GraphDatabase.driver(
+        "bolt://0.0.0.0:7687",  # Neo4j connection URL
+        auth=("neo4j", "mysecret")  # Database credentials
+    )
+```
+
+2.3 Document Processing
+----------------------
+The system supports multiple document processing methods. Here's a detailed explanation of the document loading process:
+
+```python
+async def load_doc(self, file, session, path):
+    try:
+        # Extract the base filename from the provided path
+        file_name = os.path.basename(path)
+        # Create a full path in the session's file directory
+        file_path = os.path.join(session['file_dir'], file_name)
+        
+        # Write the uploaded file content to the session's file directory
+        with open(file_path, "wb") as buffer:
+            content = await file.read()  # Asynchronously read the file content
+            buffer.write(content)        # Write the content to the file
+        
+        # Use SimpleDirectoryReader to load and process the document
+        # This reader handles various document formats and extracts text
+        documents = SimpleDirectoryReader(session['file_dir']).load_data()
+        
+        # Clean up the temporary file after processing
+        # This helps manage disk space and security
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        
+        return documents
+    except Exception as e:
+        # Handle any errors during document processing
+        print(f"Error loading document: {str(e)}")
+        # Ensure cleanup even if an error occurs
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise  # Re-raise the exception for proper error handling
+```
+
+2.4 Question Generation
+----------------------
+The system generates questions using a sophisticated query engine. Here's a detailed explanation of the question generation process:
+
+```python
+async def QueryEngine(self, difficulty_level, session):
+    # Create a query engine from the session's index
+    query_engine = session['index'].as_query_engine(
+        llm=self.llm_questions,           # Use the question-specific LLM
+        show_progress=True,               # Display progress during generation
+        storage_context=session['index'].storage_context,  # Use session's storage context
+        include_text=True,                # Include source text in responses
+    )
+    
+    # Generate questions using a detailed prompt
+    response = query_engine.query(f"""You are an AI designed to generate multiple-choice questions (MCQs) based on a provided chapter of a book. Your task is to create a set of MCQs that focus on the main subject matter of the chapter. Ensure that each question is clear, concise, and relevant to the core themes of the chapter and be closed book style. Use the following structure for the MCQs:
+            
+    1. **Question Statement**: A clear and precise question related to the chapter content.
+    2. **Answer Choices**: Four options labeled A, B, C, and D, where only one option is correct. The incorrect options should be plausible to challenge the reader's knowledge.
+    3. **Correct Answer**: give me the correct answer of the question""")
+    return response
+```
+
+3. API ENDPOINTS
+---------------
+
+3.1 Question Generation from PDF
+------------------------------
+```python
+@app.post('/questions')
+async def predict(
+    filePDF: Annotated[UploadFile | None, File()] = None,  # Optional PDF file upload
+    url: Optional[str] = Form(None),                       # Optional URL for PDF download
+    urlBool: Optional[str] = Form(None),                   # Flag to indicate URL processing
+    hasTOC: str = Form("False"),                          # Flag for Table of Contents presence
+    chapters: Optional[List[int]] = Form(None),           # List of chapter numbers (with TOC)
+    chapterslndexes: Optional[List[chapterslndexes]] = Form(None)  # Chapter indexes (without TOC)
+)
+```
+
+3.2 Survey Questions Generation
+-----------------------------
+```python
+@app.post('/survey-questions')
+async def generate_questions(filePDF: UploadFile = File(...))  # Required PDF file upload
+```
+
+3.3 Text-based Question Generation
+--------------------------------
+```python
+@app.post('/text-questions')
+async def generate_text_questions(text_input: TextInput)  # Text input for question generation
+```
+
+4. ERROR HANDLING
+----------------
+The system implements comprehensive error handling with proper resource cleanup:
+
+```python
+try:
+    # Create a new session for the request
+    session = await graphrag.create_session()
+    # ... processing logic ...
+except Exception as e:
+    # Ensure proper cleanup of resources in case of errors
+    if session:
+        await graphrag.cleanup_session(session)
+    print(f"Unexpected error: {str(e)}")
+    # Return a structured error response
+    return JSONResponse(
+        status_code=500,  # Internal server error
+        content={
+            "error": "Unexpected Error",
+            "details": str(e)  # Include error details for debugging
+        }
+    )
+```
+
+5. SESSION CLEANUP
+-----------------
+Proper cleanup of resources is essential for system stability:
+
+```python
+async def cleanup_session(self, session):
+    # Validate session object
+    if not session or 'request_id' not in session:
+        print("Warning: Invalid session object")
+        return
+        
+    request_id = session['request_id']
+    try:
+        # Clean up temporary directories
+        if os.path.exists(session['storage_dir']):
+            shutil.rmtree(session['storage_dir'])
+        if os.path.exists(session['upload_dir']):
+            shutil.rmtree(session['upload_dir'])
+        if os.path.exists(session['file_dir']):
+            shutil.rmtree(session['file_dir'])
+            
+        # Clean up Neo4j database
+        system_driver = GraphDatabase.driver(
+            "bolt://0.0.0.0:7687",
+            auth=("neo4j", "mysecret")
+        )
+        with system_driver.session(database="system") as session_db:
+            # Drop the session-specific database
+            session_db.run(f"DROP DATABASE {request_id}")
+            time.sleep(5)  # Wait for database deletion to complete
+            system_driver.close()
+```
+
+6. QUESTION FORMAT
+-----------------
+The system generates questions in a structured JSON format:
+
+```json
+{
+    "question": "Question text",
+    "answerA": "Option A",
+    "answerB": "Option B",
+    "answerC": "Option C",
+    "answerD": "Option D",
+    "correctAnswer": "answerX",
+    "difficulty": 1|2|3,
+    "chapterNo": "chapter_number"
+}
+```
+
+7. PERFORMANCE CONSIDERATIONS
+----------------------------
+
+7.1 Resource Management
+----------------------
+- Automatic cleanup of temporary files
+- Session-based isolation
+- Efficient memory usage
+- Built-in delays between batch processing
+
+7.2 Rate Limiting
+----------------
+```python
+for difficulty in ["easy", "medium", "hard"]:
+    try:
+        print(f"Generating questions for {difficulty} difficulty...")
+        for batch in range(3):  # Generate 3 batches of questions
+            test = await graphrag.QueryEngine(difficulty, session)
+            # ... process results ...
+            await asyncio.sleep(3)  # Add delay between batches
+```
+
+8. SECURITY FEATURES
+-------------------
+
+8.1 Session Isolation
+--------------------
+- Separate databases per session
+- Secure file handling
+- Temporary resource management
+
+8.2 Input Validation
+------------------
+```python
+# Validate input parameters
+if not urlBool == "True" and filePDF is None:
+    return JSONResponse(
+        status_code=400,
+        content={"error": "No file provided"}
+    )
+    
+if urlBool == "True" and not url:
+    return JSONResponse(
+        status_code=400,
+        content={"error": "urlBool is True but no URL provided"}
+    )
+```
+
+9. LIMITATIONS
+-------------
+1. PDF Processing:
+   - Requires well-structured PDFs
+   - Limited support for complex formatting
+   - Table of Contents must be properly formatted
+
+2. Resource Usage:
+   - Memory intensive for large documents
+   - Requires significant processing time
+   - Neo4j database must be properly configured
+
+10. FUTURE IMPROVEMENTS
+----------------------
+1. Planned Features:
+   - Support for more document formats
+   - Enhanced question quality metrics
+   - Improved error recovery mechanisms
+
+2. Performance Optimizations:
+   - Parallel processing support
+   - Caching mechanisms
+   - Optimized database queries
+
+11. SETUP INSTRUCTIONS
+---------------------
+1. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. Configure Neo4j database:
+   - Set up Neo4j server
+   - Configure credentials
+   - Ensure proper network access
+
+3. Set environment variables:
+   - GROQ_API_KEY
+   - NEO4J_URI
+   - NEO4J_USER
+   - NEO4J_PASSWORD
+
+4. Run the server:
+   ```bash
+   python final.py
+   ```
+
+12. BEST PRACTICES
+-----------------
+1. Document Processing:
+   - Use structured PDFs with Table of Contents
+   - Break large documents into manageable chapters
+   - Validate input files before processing
+
+2. Question Generation:
+   - Start with easy difficulty for testing
+   - Monitor response quality
+   - Adjust batch sizes based on document complexity
+
+3. Error Handling:
+   - Implement proper logging
+   - Monitor session cleanup
+   - Handle edge cases gracefully
+
+13. TROUBLESHOOTING
+------------------
+Common issues and solutions:
+
+1. Neo4j Connection Issues:
+   - Verify database credentials
+   - Check network connectivity
+   - Ensure proper database initialization
+
+2. Memory Issues:
+   - Monitor session cleanup
+   - Implement proper resource management
+   - Consider batch processing for large documents
+
+3. Question Quality:
+   - Adjust difficulty levels
+   - Monitor response patterns
+   - Implement quality checks
+
+14. MAINTENANCE
+--------------
+Regular maintenance tasks:
+
+1. Database Management:
+   - Monitor database size
+   - Implement cleanup routines
+   - Optimize queries
+
+2. Session Management:
+   - Monitor active sessions
+   - Implement stale session cleanup
+   - Track resource usage
+
+3. Error Monitoring:
+   - Implement logging
+   - Track error patterns
+   - Update error handling
+
+15. CONCLUSION
+-------------
+The GraphRAG system provides a robust solution for generating high-quality questions from various input sources. Its modular design, comprehensive error handling, and efficient resource management make it suitable for production use. Regular maintenance and monitoring are essential for optimal performance. 
