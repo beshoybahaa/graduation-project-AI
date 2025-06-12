@@ -414,7 +414,7 @@ async def predict(
     urlBool: Optional[str] = Form(None),
     hasTOC: str = Form("False"),
     chapters: Optional[List[int]] = Form(None),
-    chapterslndexes: Optional[List[chapterslndexesObj]] = Form(None)
+    chaptersIndexes: Optional[List[chapterslndexesObj] | None] = Form(None)
 ):
     session = None
     try:
@@ -437,10 +437,10 @@ async def predict(
                 content={"error": "hasTOC is True but no chapters provided " + str(chapters)}
             )
             
-        if not hasTOC == "True" and not chapterslndexes:
+        if not hasTOC == "True" and not chaptersIndexes:
             return JSONResponse(
                 status_code=400,
-                content={"error": "hasTOC is False but no chapterslndexes provided " + str(chapterslndexes)}
+                content={"error": "hasTOC is False but no chapterslndexes provided " + str(chaptersIndexes)}
             )
 
         # Create a new session for this request
@@ -481,7 +481,7 @@ async def predict(
                     )
                 list_of_chapters_pdf.append([chapter, graphrag.extract_chapter(file_path, f"{session['storage_dir']}/{session['request_id']}_chapter_{chapter}.pdf", start_page, end_page)])
         else:
-            for chapter in chapterslndexes:
+            for chapter in chaptersIndexes:
                 if not hasattr(chapter, 'number') or not hasattr(chapter, 'startPage') or not hasattr(chapter, 'endPage'):
                     return JSONResponse(
                         status_code=400,
