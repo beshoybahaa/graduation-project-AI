@@ -443,10 +443,23 @@ async def predict(
     urlBool: Optional[str] = Form(None),
     hasTOC: str = Form("False"),
     chapters: Optional[List[int]] = Form(None),
-    chaptersIndexes: Optional[List[chapterslndexesObj]] = Form(None)
+    chaptersIndexes: Optional[str] = Form(None)  # Changed to str to receive JSON string
 ):
     session = None
     try:
+        # Parse chaptersIndexes from JSON string if provided
+        chapters_indexes_parsed = None
+        if chaptersIndexes:
+            try:
+                chapters_indexes_parsed = [
+                    chapterslndexesObj(**chapter) 
+                    for chapter in json.loads(chaptersIndexes)
+                ]
+            except json.JSONDecodeError as e:
+                print(f"Error parsing chaptersIndexes JSON: {e}")
+            except Exception as e:
+                print(f"Error creating chapterslndexesObj: {e}")
+
         # Print the entire request body
         print("\n=== Request Body Details ===")
         print(f"filePDF: {filePDF}")
@@ -454,7 +467,7 @@ async def predict(
         print(f"urlBool: {urlBool}")
         print(f"hasTOC: {hasTOC}")
         print(f"chapters: {chapters}")
-        print(f"chaptersIndexes: {chaptersIndexes}")
+        print(f"chaptersIndexes (parsed): {chapters_indexes_parsed}")
         print("===========================\n")
 
         # Validate input parameters
