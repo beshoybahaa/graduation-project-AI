@@ -440,7 +440,7 @@ async def predict(
         if not hasTOC == "True" and not chapterslndexes:
             return JSONResponse(
                 status_code=400,
-                content={"error": "hasTOC is False but no chapterslndexes provided"}
+                content={"error": "hasTOC is False but no chapterslndexes provided " + str(chapterslndexes)}
             )
 
         # Create a new session for this request
