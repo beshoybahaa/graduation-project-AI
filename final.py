@@ -414,10 +414,20 @@ async def predict(
     urlBool: Optional[str] = Form(None),
     hasTOC: str = Form("False"),
     chapters: Optional[List[int]] = Form(None),
-    chaptersIndexes: Optional[List[chapterslndexesObj] | None] = Form(None)
+    chaptersIndexes: Optional[List[chapterslndexesObj]] = Form(None)
 ):
     session = None
     try:
+        # Print the entire request body
+        print("\n=== Request Body Details ===")
+        print(f"filePDF: {filePDF}")
+        print(f"url: {url}")
+        print(f"urlBool: {urlBool}")
+        print(f"hasTOC: {hasTOC}")
+        print(f"chapters: {chapters}")
+        print(f"chaptersIndexes: {chaptersIndexes}")
+        print("===========================\n")
+
         # Validate input parameters
         if not urlBool == "True" and filePDF is None:
             return JSONResponse(
@@ -436,11 +446,11 @@ async def predict(
                 status_code=400,
                 content={"error": "hasTOC is True but no chapters provided " + str(chapters)}
             )
-            
+        
         if not hasTOC == "True" and not chaptersIndexes:
             return JSONResponse(
                 status_code=400,
-                content={"error": "hasTOC is False but no chapterslndexes provided " + str(chaptersIndexes)}
+                content={"error": "hasTOC is False but no chaptersIndexes provided \n chaptersIndexes: " + str(chaptersIndexes)}
             )
 
         # Create a new session for this request
