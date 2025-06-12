@@ -380,6 +380,9 @@ class graphRAG:
         return output_pdf
 
 class RequestLoggingMiddleware:
+    def __init__(self, app):
+        self.app = app
+
     async def __call__(self, request: Request, call_next: Callable):
         # Get the request body
         body = await request.body()
