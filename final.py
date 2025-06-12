@@ -48,7 +48,7 @@ llm = Groq(
 )
 Settings.llm = llm
 
-class chapterslndexes(BaseModel):
+class chapterslndexesObj(BaseModel):
     number: str
     startPage: int
     endPage: int
@@ -414,7 +414,7 @@ async def predict(
     urlBool: Optional[str] = Form(None),
     hasTOC: str = Form("False"),
     chapters: Optional[List[int]] = Form(None),
-    chapterslndexes: Optional[List[chapterslndexes]] = Form(None)
+    chapterslndexes: Optional[List[chapterslndexesObj]] = Form(None)
 ):
     session = None
     try:
