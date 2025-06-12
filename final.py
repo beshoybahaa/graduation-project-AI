@@ -443,17 +443,17 @@ async def predict(
     urlBool: Optional[str] = Form(None),
     hasTOC: str = Form("False"),
     chapters: Optional[List[int]] = Form(None),
-    chaptersIndexes: Optional[str] = Form(None)  # Changed to str to receive JSON string
+    chaptersIndexesString: Optional[str] = Form(None)  # Changed to str to receive JSON string
 ):
     session = None
     try:
         # Parse chaptersIndexes from JSON string if provided
-        chapters_indexes_parsed = None
-        if chaptersIndexes:
+        chaptersIndexes = None
+        if chaptersIndexesString:
             try:
-                chapters_indexes_parsed = [
+                chaptersIndexes = [
                     chapterslndexesObj(**chapter) 
-                    for chapter in json.loads(chaptersIndexes)
+                    for chapter in json.loads(chaptersIndexesString)
                 ]
             except json.JSONDecodeError as e:
                 print(f"Error parsing chaptersIndexes JSON: {e}")
@@ -467,7 +467,7 @@ async def predict(
         print(f"urlBool: {urlBool}")
         print(f"hasTOC: {hasTOC}")
         print(f"chapters: {chapters}")
-        print(f"chaptersIndexes (parsed): {chapters_indexes_parsed}")
+        print(f"chaptersIndexes (parsed): {chaptersIndexes}")
         print("===========================\n")
 
         # Validate input parameters
@@ -533,7 +533,7 @@ async def predict(
                     )
                 list_of_chapters_pdf.append([chapter, graphrag.extract_chapter(file_path, f"{session['storage_dir']}/{session['request_id']}_chapter_{chapter}.pdf", start_page, end_page)])
         else:
-            for chapter in chapters_indexes_parsed:
+            for chapter in chaptersIndexes:
                 if not hasattr(chapter, 'number') or not hasattr(chapter, 'startPage') or not hasattr(chapter, 'endPage'):
                     return JSONResponse(
                         status_code=400,
