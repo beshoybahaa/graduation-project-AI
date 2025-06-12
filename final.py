@@ -383,24 +383,28 @@ class RequestLoggingMiddleware:
     def __init__(self, app):
         self.app = app
 
-    async def __call__(self, request: Request, call_next: Callable):
-        # Get the request body
-        body = await request.body()
-        try:
-            # Try to parse as JSON
-            body_json = json.loads(body)
-            print("\n=== Request Body ===")
-            print(json.dumps(body_json, indent=2))
-            print("===================\n")
-        except:
-            # If not JSON, print raw body
-            print("\n=== Request Body ===")
-            print(body.decode())
-            print("===================\n")
-        
-        # Continue with the request
-        response = await call_next(request)
-        return response
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+
+        async def receive_with_logging():
+            message = await receive()
+            if message["type"] == "http.request":
+                body = message.get("body", b"")
+                try:
+                    # Try to parse as JSON
+                    body_json = json.loads(body)
+                    print("\n=== Request Body ===")
+                    print(json.dumps(body_json, indent=2))
+                    print("===================\n")
+                except:
+                    # If not JSON, print raw body
+                    print("\n=== Request Body ===")
+                    print(body.decode() if body else "Empty body")
+                    print("===================\n")
+            return message
+
+        await self.app(scope, receive_with_logging, send)
 
 app = FastAPI()
 
