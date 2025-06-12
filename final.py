@@ -8,13 +8,13 @@ import tempfile
 import time
 import requests
 # from datetime import datetime
-from typing import Union, Annotated, Optional, List
+from typing import Union, Annotated, Optional, List, Callable
 # from math import ceil
 # from functools import partial
 
 # Third-party imports
 import nest_asyncio
-from fastapi import FastAPI, UploadFile, Form, File
+from fastapi import FastAPI, UploadFile, Form, File, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
@@ -379,8 +379,30 @@ class graphRAG:
                 writer.write(output_file)
         return output_pdf
 
+class RequestLoggingMiddleware:
+    async def __call__(self, request: Request, call_next: Callable):
+        # Get the request body
+        body = await request.body()
+        try:
+            # Try to parse as JSON
+            body_json = json.loads(body)
+            print("\n=== Request Body ===")
+            print(json.dumps(body_json, indent=2))
+            print("===================\n")
+        except:
+            # If not JSON, print raw body
+            print("\n=== Request Body ===")
+            print(body.decode())
+            print("===================\n")
+        
+        # Continue with the request
+        response = await call_next(request)
+        return response
 
 app = FastAPI()
+
+# Add the middleware
+app.add_middleware(RequestLoggingMiddleware)
 
 # create the graphRAG object
 graphrag = graphRAG()
