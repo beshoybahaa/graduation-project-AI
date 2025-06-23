@@ -1,3 +1,19 @@
+# Ignore everything
+*
+
+# But do not ignore these files
+!final.py
+!README.md
+!Dockerfile
+
 quizzaty4ram_key.pem
 quizzaty4ram_key.pemZone.Identifier
 your-key.pub
+commands.txt
+documentation.txt
+eval.ipynb
+graphRAG_aws.py
+quizzaty_api_colab.py
+quizzaty_api_concurrency.py
+quizzaty_api_sequential.py
+quizzaty_kaggle.py
